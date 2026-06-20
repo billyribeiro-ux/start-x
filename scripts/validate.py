@@ -47,6 +47,8 @@ def main() -> None:
     ap.add_argument("--end", default="2026-06-01")
     ap.add_argument("--horizon", default="short", choices=["short", "long"])
     ap.add_argument("--mode", default="both", choices=["pooled", "per_symbol", "both"])
+    ap.add_argument("--long-th", type=float, default=0.6, dest="long_th")
+    ap.add_argument("--short-th", type=float, default=0.4, dest="short_th")
     args = ap.parse_args()
 
     settings = get_settings()
@@ -57,7 +59,8 @@ def main() -> None:
 
     print(f"Validating {tickers}\n  window {args.start}→{args.end}  horizon={args.horizon}")
     with FMPClient(settings) as client:
-        kw = dict(client=client, cache=cache, universe=universe, settings=settings)
+        kw = dict(client=client, cache=cache, universe=universe, settings=settings,
+                  long_th=args.long_th, short_th=args.short_th)
         if args.mode in ("pooled", "both"):
             _print(run_pooled(tickers, args.start, args.end, args.horizon, **kw))
         if args.mode in ("per_symbol", "both"):
