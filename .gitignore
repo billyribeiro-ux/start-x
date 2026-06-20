@@ -28,6 +28,10 @@ artifacts/
 *.pkl
 *.joblib
 
+# Generated trade exports
+*_trades.csv
+trades*.csv
+
 # OS / editor
 .DS_Store
 .idea/
