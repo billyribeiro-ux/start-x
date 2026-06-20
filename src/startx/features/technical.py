@@ -19,6 +19,7 @@ RSI_WINDOW = 14
 BOLLINGER_WINDOW = 20
 HIGH_LOW_WINDOW = 252  # ~52 weeks
 DRAWDOWN_WINDOW = 252
+RECENT_WINDOWS = (20, 63)  # ~1 month, ~1 quarter swing extremes
 _ANNUALIZE = float(np.sqrt(252.0))
 
 
@@ -110,6 +111,17 @@ def technical_features(signals: pd.DataFrame) -> pd.DataFrame:
     roll_low = low.rolling(HIGH_LOW_WINDOW, min_periods=1).min()
     out["dist_52w_high"] = (close / roll_high - 1.0).values
     out["dist_52w_low"] = (close / roll_low - 1.0).values
+
+    # -- % off all-time high / all-time low (expanding since loaded history; PIT) ------------
+    ath = high.expanding(min_periods=1).max()
+    atl = low.expanding(min_periods=1).min()
+    out["pct_off_ath"] = (close / ath - 1.0).values
+    out["pct_off_atl"] = (close / atl - 1.0).values
+
+    # -- % off recent swing high / low over shorter windows ----------------------------------
+    for w in RECENT_WINDOWS:
+        out[f"pct_off_high_{w}"] = (close / high.rolling(w, min_periods=1).max() - 1.0).values
+        out[f"pct_off_low_{w}"] = (close / low.rolling(w, min_periods=1).min() - 1.0).values
 
     # -- drawdown vs trailing-252 max close --------------------------------------------------
     roll_max_close = close.rolling(DRAWDOWN_WINDOW, min_periods=1).max()
