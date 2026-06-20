@@ -23,6 +23,7 @@ from startx.backtest.engine import BacktestResult
 from startx.data.cache import ParquetCache
 from startx.data.prices import get_prices
 from startx.data.universe import load_universe
+from startx.events.detect import compute_signals
 from startx.fmp.client import FMPClient
 from startx.labeling.config import label_horizon
 from startx.settings import get_settings
@@ -43,6 +44,31 @@ def _exit_reason(touch: str, side: str) -> str:
     if touch == "sl":  # lower barrier hit first
         return "stop_hit" if side == "long" else "target_hit"
     return "unknown"
+
+
+def _forensics(prices: pd.DataFrame) -> pd.DataFrame:
+    """Entry-day microstructure for each date: RVOL, volume, ATR%, gap%, AR-z, vol-z, candle."""
+    p = prices.sort_values("date").reset_index(drop=True)
+    sig = compute_signals(p, market=None)  # adds ar_z, vol_z (gap already in prices)
+    vol = p["volume"].astype(float)
+    rvol = vol / vol.rolling(20, min_periods=5).mean()
+    h, l, c, o = p["high"], p["low"], p["close"], p["open"]
+    pc = c.shift(1)
+    tr = pd.concat([(h - l), (h - pc).abs(), (l - pc).abs()], axis=1).max(axis=1)
+    atr_pct = tr.ewm(alpha=1 / 14, min_periods=14, adjust=False).mean() / c
+    rng = (h - l).replace(0, np.nan)
+    clv = ((c - l) - (h - c)) / rng  # +1 closed at high, -1 closed at low
+    return pd.DataFrame({
+        "entry_date": p["date"],
+        "f_volume": vol.round(0),
+        "f_rvol20": rvol.round(2),
+        "f_atr_pct": (atr_pct * 100).round(2),
+        "f_gap_pct": (p["gap"] * 100).round(2),
+        "f_ar_z": np.round(sig["ar_z"].to_numpy(), 2),
+        "f_vol_z": np.round(sig["vol_z"].to_numpy(), 2),
+        "f_candle": np.where(c >= o, "bull", "bear"),
+        "f_clv": clv.round(2),
+    })
 
 
 def _enrich(symbol: str, bt: BacktestResult, prices: pd.DataFrame, horizon: str) -> pd.DataFrame:
@@ -78,10 +104,12 @@ def _enrich(symbol: str, bt: BacktestResult, prices: pd.DataFrame, horizon: str)
     t["prob_up"] = t.get("prob_up").round(3)
     t["outcome"] = t.get("ret_net", 0.0).map(lambda r: "WIN" if r > 0 else "LOSS")
 
+    t = t.merge(_forensics(prices), on="entry_date", how="left")
     cols = ["symbol", "side", "entry_date", "entry_price", "target_price", "stop_price",
             "reward_pct", "risk_pct", "rr", "exit_date", "exit_price", "exit_reason",
             "bars_held", "price_move_pct", "net_return_pct", "pnl_usd_per_10k", "prob_up",
-            "outcome"]
+            "f_volume", "f_rvol20", "f_atr_pct", "f_gap_pct", "f_ar_z", "f_vol_z", "f_candle",
+            "f_clv", "outcome"]
     return t[cols].sort_values(["entry_date", "symbol"]).reset_index(drop=True)
 
 
