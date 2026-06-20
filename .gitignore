@@ -1,0 +1,33 @@
+# Secrets — NEVER commit
+.env
+.env.*
+!.env.example
+
+# Local data cache (re-pullable from FMP)
+data/
+*.parquet
+*.duckdb
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Models / artifacts
+artifacts/
+*.pkl
+*.joblib
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

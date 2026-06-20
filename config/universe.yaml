@@ -1,0 +1,17 @@
+# Trading universe. Each symbol maps a display ticker -> FMP symbol + type.
+# type drives attribution: "stock" gets company catalysts (earnings/grades/insider);
+# "index_etf" gets macro catalysts (econ calendar, VIX, gap/volume) only.
+benchmark: "^GSPC"   # market model benchmark for single-stock abnormal returns
+
+symbols:
+  SPY:  { fmp: "SPY",    type: index_etf, name: "SPDR S&P 500 ETF" }
+  SPX:  { fmp: "^GSPC",  type: index_etf, name: "S&P 500 Index" }
+  QQQ:  { fmp: "QQQ",    type: index_etf, name: "Invesco QQQ (Nasdaq 100)" }
+  IWM:  { fmp: "IWM",    type: index_etf, name: "iShares Russell 2000 ETF" }
+  TSLA: { fmp: "TSLA",   type: stock,     name: "Tesla Inc." }
+  NVDA: { fmp: "NVDA",   type: stock,     name: "NVIDIA Corp." }
+  AAPL: { fmp: "AAPL",   type: stock,     name: "Apple Inc." }
+
+# Extra series pulled for context (not traded)
+context:
+  VIX: { fmp: "^VIX", name: "CBOE Volatility Index" }
