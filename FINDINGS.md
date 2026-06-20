@@ -60,7 +60,8 @@ the bull; subtract it). On *total return* nothing beats buy-and-hold (you're <10
 
 **SURVIVORS (real OOS edge):**
 - **20-day-high breakout > SMA200, chandelier exit** (momentum) — best risk-adjusted: TEST PF 3.64,
-  maxDD −4.4%, ret/DD 11.8 vs 5.1 B&H. Generalizes untuned to QQQ/SPX; **fails on IWM**.
+  maxDD −4.4%, ret/DD 11.8 vs 5.1 B&H. Generalizes untuned to QQQ/SPX; **fails on IWM**. Module:
+  `strategy/momentum_breakout.py` (TEST 2023-26: 20 trades, 55% win, PF 3.78, +50%, −4.8% DD).
 - **VRP-high** (VIX − 20d realized vol in top 5% of trailing yr), chandelier (volatility) — TEST
   18 trades / 61% / PF 5.36, decent n, consistent. Best-sampled vol entry.
 - **IBS < 0.1 in an uptrend**, fixed 1.5 ATR (mean-reversion) — only oversold signal with positive
