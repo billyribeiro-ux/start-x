@@ -26,6 +26,9 @@ from .technical import technical_features
 
 _FWD_PREFIX = "fwd_"
 
+#: Bump whenever feature definitions change so stale cached matrices are not reused.
+FEATURE_VERSION = 2
+
 
 def _drop_forward(df: pd.DataFrame) -> pd.DataFrame:
     """Defensive guard: strip any forward-looking column before it can leak into features."""
@@ -49,6 +52,14 @@ def build_feature_matrix(
     cache = cache or ParquetCache(settings.cache_dir)
     universe = universe or load_universe()
     spec = universe.spec(ticker)
+
+    # Feature compute is heavy (~minutes/ticker over full history); cache the assembled
+    # matrix per (symbol, window, feature-version) so repeated builds are near-free.
+    cache_key = f"features/{spec.fmp}/{start}__{end}__v{FEATURE_VERSION}"
+    if not refresh:
+        cached = cache.load(cache_key)
+        if cached is not None:
+            return cached
 
     prices = get_prices(client, cache, spec.fmp, settings.history_start, refresh)
     if prices.empty:
@@ -91,7 +102,9 @@ def build_feature_matrix(
         sector = None
     matrix.insert(2, "sector", sector)
 
-    return _drop_forward(matrix)
+    result = _drop_forward(matrix)
+    cache.save(cache_key, result)
+    return result
 
 
 def build_pooled_matrix(
