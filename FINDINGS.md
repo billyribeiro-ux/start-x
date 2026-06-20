@@ -27,6 +27,23 @@ What we learned, hard-won and evidence-backed. Read this before re-deriving anyt
 - **A looser stop (2.5-3σ) helps the recent bull window but still loses OOS** — it's a *bet that
   the uptrend continues*, not a free lunch.
 
+## VIX as a signal (the long debate — settled by the tape)
+- **VIX "neutral" price ≈ 18.** Three independent methods converge: 16y mean = 18.4; the
+  mean-reversion attractor (zero-drift level from `dVIX = 0.695 - 0.0378*VIX`) = **18.4**; it's the
+  center of the distribution (median 16.8). Below ~18 VIX drifts up, above ~18 it mean-reverts down
+  (half-life ~18 trading days).
+- **High VIX is NOT a short on the index — it's a bounce.** 2010-2026: shorting SPX at VIX>=30
+  loses −0.95%/trade (35% win); VIX>=40 loses −2.13% (17% win). Forward S&P *rises* with VIX at
+  every horizon (VIX 30-40 -> +1.30% fwd 10d). The −0.75 VIX/SPX relationship is **same-day
+  (coincident), not predictive** — VIX is high *because* the drop already happened.
+- **Capitulation (persistent vol breakout) = a LONG.** ≥3 consecutive closes above VIX's 2.5σ
+  Bollinger band while VIX>neutral -> SPX +0.65-0.89% fwd 5d, ~68-70% up. Shorting it wins ~30%.
+  The market **gaps up ~+0.28% the next day (10x the +0.03% baseline, 63% up)** — so enter at the
+  signal close to own the gap. Module: `src/startx/strategy/vix_capitulation.py` (long index,
+  chandelier 3 ATR). Full 2010-now: 19 trades, PF 2.26, +$124/sh; **survives OOS (2010-2022 PF
+  1.22)** where the dip-buy chandelier did not — but it's rare (~1.2/yr) and small-sample, and it
+  fails buying into the *first leg of a bear* (Jan 2022, −$19.75). Needs a trend/regime guard.
+
 ## Loser anatomy (the "died at stop" trades)
 - ~15% straight losers (never green), ~45% worked but <1 ATR (chop/fakeouts), ~38% hit >=1 ATR
   then round-tripped. Only the last group is salvageable by stop management, and doing so costs
