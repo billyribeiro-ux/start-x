@@ -3,8 +3,9 @@
 .env.*
 !.env.example
 
-# Local data cache (re-pullable from FMP)
-data/
+# Local data cache (re-pullable from FMP) — anchored to repo root so it does NOT
+# match the source package src/startx/data/.
+/data/
 *.parquet
 *.duckdb
 
