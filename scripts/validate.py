@@ -49,13 +49,15 @@ def main() -> None:
     ap.add_argument("--mode", default="both", choices=["pooled", "per_symbol", "both"])
     ap.add_argument("--long-th", type=float, default=0.6, dest="long_th")
     ap.add_argument("--short-th", type=float, default=0.4, dest="short_th")
+    ap.add_argument("--tickers", default=None,
+                    help="comma-separated subset; default = full universe")
     args = ap.parse_args()
 
     settings = get_settings()
     settings.require_key()
     cache = ParquetCache(settings.cache_dir)
     universe = load_universe()
-    tickers = universe.tickers
+    tickers = [t.strip() for t in args.tickers.split(",")] if args.tickers else universe.tickers
 
     print(f"Validating {tickers}\n  window {args.start}→{args.end}  horizon={args.horizon}")
     with FMPClient(settings) as client:
