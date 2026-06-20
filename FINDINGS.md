@@ -52,6 +52,20 @@ What we learned, hard-won and evidence-backed. Read this before re-deriving anyt
   entered on a volume surge into weakness (capitulation).** Grinders close Day-1 red/flat. A
   *post-entry* Day-1 confirmation is the supportable filter (the entry bar itself can't predict it).
 
+## Standing lessons (the ones that change how we trade)
+- **Coincident ≠ predictive.** VIX/SPX is −0.75 *same-day* — a mirror, not a forecast. The edge
+  only lives in relationships that survive the shift from same-bar to next-bar. Most "obvious"
+  market reads are coincident and untradeable.
+- **The tradeable edge is usually the *opposite* of the naive read.** Fear at an extreme isn't a
+  sell — it's the tell that the sellers are done. High VIX = bounce, not short.
+- **"High/low" is meaningless without an *adaptive* baseline.** A static full-sample VIX neutral
+  (18) is wrong: the baseline drifts hard by regime (median VIX 10.8 in 2017, 14.6 in 2024, 18.3 in
+  2026). Use a trailing/rolling neutral, not a frozen constant. The same goes for any threshold.
+- **The exit carries the edge as much as the entry.** The capitulation signal only profits with a
+  chandelier; fixed targets lose OOS because the P&L lives in a few monsters. Don't cut runners.
+- **Re-learn signals when the window changes.** A shorter/newer period is a *different* regime — do
+  not carry an old edge (e.g. RSI-2) forward as gospel; re-discover and re-rank on the new data.
+
 ## Method guardrails (do not "fix" away)
 - Success = **out-of-sample** robustness, not win rate or in-sample $. Every flashy in-sample
   number this project produced was a mirage until tested on a held-out period.

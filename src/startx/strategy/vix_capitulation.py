@@ -18,7 +18,10 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-VIX_NEUTRAL = 18.0  # zero-drift mean-reversion level (dVIX=0.695-0.0378*VIX -> 18.4), 2010-2026
+VIX_NEUTRAL = 18.0  # full-sample zero-drift level; DEPRECATED as a static floor — VIX neutral
+                    # drifts by regime (median 10.8 in 2017, 14.6 in 2024, 18.3 in 2026), so the
+                    # default below is "adaptive": a trailing-1yr median, recomputed each day.
+NEUTRAL_WINDOW = 252  # trailing window (~1yr) for the adaptive neutral baseline
 
 
 def vix_upper_band(vix_close: pd.Series, window: int = 20, k: float = 2.5) -> pd.Series:
@@ -28,6 +31,12 @@ def vix_upper_band(vix_close: pd.Series, window: int = 20, k: float = 2.5) -> pd
     return mid + k * sd
 
 
+def adaptive_neutral(vix_close: pd.Series, window: int = NEUTRAL_WINDOW) -> pd.Series:
+    """Regime-aware VIX neutral: the trailing-``window`` median, recomputed each day (point-in-time,
+    no lookahead). Replaces the static 18 so "above neutral" tracks the *current* regime."""
+    return vix_close.rolling(window, min_periods=60).median()
+
+
 def _atr(prices: pd.DataFrame, window: int = 14) -> pd.Series:
     h, l, c = prices["high"], prices["low"], prices["close"]
     pc = c.shift(1)
@@ -35,22 +44,24 @@ def _atr(prices: pd.DataFrame, window: int = 14) -> pd.Series:
     return tr.ewm(alpha=1 / window, min_periods=window, adjust=False).mean()
 
 
-def capitulation_signals(vix: pd.DataFrame, *, neutral: float = VIX_NEUTRAL,
+def capitulation_signals(vix: pd.DataFrame, *, neutral="adaptive",
                          band_window: int = 20, band_k: float = 2.5,
                          min_closes: int = 3) -> pd.Series:
     """Fire on the day VIX logs its ``min_closes``-th *consecutive* close above the upper band
-    while VIX > ``neutral``. One trigger per capitulation episode (the run-length crossing point),
-    so we don't pile into the same spike repeatedly. Returns a bool Series aligned to ``vix``.
+    while VIX > its neutral baseline. ``neutral`` is "adaptive" (trailing-1yr median, regime-aware)
+    by default, or pass a float to pin it. One trigger per capitulation episode (the run-length
+    crossing point), so we don't pile into the same spike. Returns a bool Series aligned to ``vix``.
     """
     v = vix.sort_values("date").reset_index(drop=True)
     band = vix_upper_band(v["close"], band_window, band_k)
-    above = (v["close"] > band) & (v["close"] > neutral)
+    base = adaptive_neutral(v["close"]) if neutral == "adaptive" else float(neutral)
+    above = (v["close"] > band) & (v["close"] > base)
     # consecutive run length of `above`
     run = above * (above.groupby((~above).cumsum()).cumcount() + 1)
     return run == min_closes  # exactly the Nth close -> one entry per episode
 
 
-def backtest(index_prices: pd.DataFrame, vix: pd.DataFrame, *, neutral: float = VIX_NEUTRAL,
+def backtest(index_prices: pd.DataFrame, vix: pd.DataFrame, *, neutral="adaptive",
              band_window: int = 20, band_k: float = 2.5, min_closes: int = 3,
              exit: str = "chandelier", atr_mult: float = 3.0, atr_window: int = 14,
              max_days: int = 40, cost_bps: float = 2.0, start=None, end=None):
