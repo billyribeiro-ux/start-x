@@ -28,13 +28,15 @@ artifacts/
 *.pkl
 *.joblib
 
-# Generated trade exports / analysis CSVs
+# Generated trade exports / analysis CSVs + chart artifacts
 *_trades.csv
 trades*.csv
 meanrev_*.csv
 *_full.csv
 spy_*.csv
 *_capitulation_*.csv
+*.png
+*.jpg
 
 # OS / editor
 .DS_Store
