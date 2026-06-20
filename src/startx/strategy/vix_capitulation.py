@@ -31,10 +31,26 @@ def vix_upper_band(vix_close: pd.Series, window: int = 20, k: float = 2.5) -> pd
     return mid + k * sd
 
 
-def adaptive_neutral(vix_close: pd.Series, window: int = NEUTRAL_WINDOW) -> pd.Series:
-    """Regime-aware VIX neutral: the trailing-``window`` median, recomputed each day (point-in-time,
-    no lookahead). Replaces the static 18 so "above neutral" tracks the *current* regime."""
-    return vix_close.rolling(window, min_periods=60).median()
+def adaptive_neutral(vix_close: pd.Series, window: int = NEUTRAL_WINDOW,
+                     method: str = "attractor") -> pd.Series:
+    """Regime-aware VIX neutral, recomputed each day (point-in-time, no lookahead).
+
+    method='attractor' (default, OOS-validated best): the zero-drift mean-reversion level on the
+    trailing window — regress dVIX_t = a + b*VIX_{t-1} and solve neutral = -a/b. This raises the bar
+    enough in calm regimes to reject ordinary vol pops while still flagging genuine extremes.
+    method='p70' is the simpler, near-equivalent fallback (trailing 70th percentile). 'median' was
+    the first cut and is too low a floor (admits weak signals).
+    """
+    if method == "median":
+        return vix_close.rolling(window, min_periods=60).median()
+    if method in ("p70", "percentile"):
+        return vix_close.rolling(window, min_periods=60).quantile(0.70)
+    # attractor: neutral = -a/b from dVIX_t = a + b*VIX_{t-1}, via rolling moments (no lookahead)
+    lvl = vix_close.shift(1); chg = vix_close.diff()
+    r = lambda s: s.rolling(window, min_periods=60).mean()
+    El, Ec, Elc, Ell = r(lvl), r(chg), r(lvl * chg), r(lvl * lvl)
+    b = (Elc - El * Ec) / (Ell - El * El)
+    return El - Ec / b
 
 
 def _atr(prices: pd.DataFrame, window: int = 14) -> pd.Series:

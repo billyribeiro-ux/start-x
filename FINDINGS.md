@@ -52,6 +52,32 @@ What we learned, hard-won and evidence-backed. Read this before re-deriving anyt
   entered on a volume surge into weakness (capitulation).** Grinders close Day-1 red/flat. A
   *post-entry* Day-1 confirmation is the supportable filter (the entry bar itself can't predict it).
 
+## Relearned signal set — 2019→2026 (TRAIN 2019-22 / TEST 2023-26, drift- & risk-adjusted)
+Four parallel agents re-derived signals from scratch on the locked window. The honest metric is
+**alpha = per-trade expectancy − same-holding-period SPY drift** (a part-time long silently collects
+the bull; subtract it). On *total return* nothing beats buy-and-hold (you're <100% invested in a
++96% bull); the edges below are **risk-adjusted** — ~¼ the drawdown, higher ret/DD.
+
+**SURVIVORS (real OOS edge):**
+- **20-day-high breakout > SMA200, chandelier exit** (momentum) — best risk-adjusted: TEST PF 3.64,
+  maxDD −4.4%, ret/DD 11.8 vs 5.1 B&H. Generalizes untuned to QQQ/SPX; **fails on IWM**.
+- **VRP-high** (VIX − 20d realized vol in top 5% of trailing yr), chandelier (volatility) — TEST
+  18 trades / 61% / PF 5.36, decent n, consistent. Best-sampled vol entry.
+- **IBS < 0.1 in an uptrend**, fixed 1.5 ATR (mean-reversion) — only oversold signal with positive
+  drift-adjusted alpha across SPY/SPX/QQQ/IWM (+0.05 to +0.73%), 62–69% win. Most trades of any.
+- **VIX-capitulation long** (≥3 closes > 2.5σ band, VIX>neutral), chandelier — holds OOS (TEST
+  ~80%/PF 15) but **tiny n (4–5)**: high-conviction, low-frequency.
+- **Risk filters:** credit-on (HYG/LQD>SMA50) and gold-calm (GLD/SPY<SMA20) roughly **halve
+  drawdown**; on a dip-buy, credit-on lifts win 70%→77%, PF 1.79→3.03. *Caveat: intermarket cache
+  only starts 2022-06 → single-window test, soft.*
+
+**ADAPTIVE VIX NEUTRAL = zero-drift attractor on trailing 252d** (`adaptive_neutral`, default).
+Static 18 was a trap (leaned on one lucky 2021 trade); p70-252 is the simpler near-equal fallback.
+
+**DEAD / discarded OOS:** RSI-2 (raw-positive but **drift-adjusted alpha −0.22%** — was just riding
+drift), pre-FOMC drift (didn't persist), Santa/sell-in-May (B&H proxies), day-of-week, rates
+direction, dollar, breadth%, growth-vs-small-cap (all TRAIN→TEST collapses / 2022 artifacts).
+
 ## Standing lessons (the ones that change how we trade)
 - **Coincident ≠ predictive.** VIX/SPX is −0.75 *same-day* — a mirror, not a forecast. The edge
   only lives in relationships that survive the shift from same-bar to next-bar. Most "obvious"
