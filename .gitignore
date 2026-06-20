@@ -28,9 +28,11 @@ artifacts/
 *.pkl
 *.joblib
 
-# Generated trade exports
+# Generated trade exports / analysis CSVs
 *_trades.csv
 trades*.csv
+meanrev_*.csv
+*_full.csv
 
 # OS / editor
 .DS_Store
