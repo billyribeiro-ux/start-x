@@ -111,6 +111,26 @@ def test_autopsy_robust_to_missing_prices():
     assert np.isnan(out["rvol_20"].iloc[0])
 
 
+def test_forensic_features_exclude_outcome_and_level_columns():
+    """Allow-list guard: strategy outcome/price-level columns must NEVER be eligible features.
+
+    A deny-list let ``ret``/``exit_price``/``entry_price``/``target``/``stop`` leak into the
+    meta-model (OOS AUC -> 1.0, fake "100% win"). Genuine pre-entry forensics + the carried signal
+    must remain eligible.
+    """
+    df = pd.DataFrame({
+        "symbol": ["SPY"], "entry_date": [pd.Timestamp("2025-01-01")],
+        "exit_date": [pd.Timestamp("2025-01-03")], "t1": [pd.Timestamp("2025-01-03")],
+        "is_win": [1], "ret_net": [0.01], "ret": [0.01], "entry_price": [600.0],
+        "target": [610.0], "stop": [590.0], "exit_price": [610.0], "pnl_per_share": [10.0],
+        "rvol_20": [1.2], "atr_expansion": [1.3], "gap_pct": [0.002], "ar_z": [-1.1],
+        "ibs_entry": [0.03], "candle_doji": [1],
+    })
+    feats = set(forensic_feature_columns(df))
+    assert not feats & {"ret", "entry_price", "target", "stop", "exit_price", "pnl_per_share"}
+    assert {"rvol_20", "atr_expansion", "gap_pct", "ar_z", "ibs_entry", "candle_doji"} <= feats
+
+
 def test_win_loss_signature_ranks_separating_feature_first():
     """The feature that actually separates wins from losses must rank first by |AUC-0.5|."""
     autopsy = _synthetic_autopsy(400, edge=2.0, shuffle=False, seed=1)

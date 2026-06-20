@@ -52,6 +52,23 @@ What we learned, hard-won and evidence-backed. Read this before re-deriving anyt
   entered on a volume surge into weakness (capitulation).** Grinders close Day-1 red/flat. A
   *post-entry* Day-1 confirmation is the supportable filter (the entry bar itself can't predict it).
 
+## Self-learning meta-filter on the IBS dip-buy (the loss-autopsy doing its job)
+Ran the project's own `autopsy_trades → win_loss_signature → walk_forward_metalabel` on the IBS
+dip-buy (885 trades pooled SPY/SPX/QQQ for training; SPY 2019-26 evaluated). The machinery **learned
+to skip losers** instead of us hand-coding a rule.
+- **Leak caught in our OWN module:** `forensic_feature_columns` was a deny-list and let `ret`/
+  `exit_price`/price levels through → OOS AUC 1.0, fake "100% win". Fixed to an allow-list (forensic
+  families + candle one-hots + registered pre-entry signals); regression test added. THE project
+  principle catching itself.
+- **What it learned:** winners dip on a wider-range / ATR-expanding bar that gaps slightly UP (a
+  flush already snapping back); losers are quiet bleeds-lower (negative gap, gap-down marubozu).
+  Every single forensic is weak alone (AUC 0.46-0.57) — the edge is only in the combination.
+- **OOS lift (SPY TEST 2023-26, threshold P(win)≥0.50 pre-registered):** base IBS 69 trades / 65%
+  win / PF 1.93 / drift-adj alpha **−0.055%** → filtered 37 / **84%** / PF **5.12** / maxDD −1.8% /
+  drift-adj alpha **+0.081%**. Flips alpha negative→positive; skips the 2026-03 knife-catch cluster
+  (all three < 0.50). Honest caveats: small n (37 test / 7 in 2025+), edge is model-dependent
+  (GradientBoosting barely filters) and threshold-sensitive — loss-avoidance, not a money-printer.
+
 ## Relearned signal set — 2019→2026 (TRAIN 2019-22 / TEST 2023-26, drift- & risk-adjusted)
 Four parallel agents re-derived signals from scratch on the locked window. The honest metric is
 **alpha = per-trade expectancy − same-holding-period SPY drift** (a part-time long silently collects

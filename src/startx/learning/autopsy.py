@@ -48,6 +48,11 @@ _INTRADAY_NUMERIC = (
 _OUTCOME_COLS = ("symbol", "entry_date", "exit_date", "ret_net", "ret_gross", "is_win", "t1")
 #: Prefix marking the one-hot candle-archetype flags.
 _CANDLE_PREFIX = "candle_"
+#: Carried *pre-entry* signal columns that ARE legitimate features (the primary model's own signal
+#: known at decision time). Extend this when a new primary signal is added. Anything NOT here and
+#: not a forensic/candle column is excluded — see :func:`forensic_feature_columns`.
+_SIGNAL_COLS = ("prob_up", "prob_win", "meta_prob_win", "ibs_entry", "rsi2_entry", "vix_level",
+                "vix_pctile")
 
 
 def _nan_daily() -> dict[str, float]:
@@ -148,18 +153,22 @@ def autopsy_trades(
 
 
 def forensic_feature_columns(autopsy: pd.DataFrame) -> list[str]:
-    """Numeric forensic feature columns in an autopsy frame (excludes ids/outcome/labels).
+    """Eligible forensic feature space for :func:`win_loss_signature` and the meta-model — an
+    ALLOW-list, not a deny-list.
 
-    This is the eligible feature space for both :func:`win_loss_signature` and the meta-model:
-    every numeric column that is not a trade identity / outcome column. The one-hot ``candle_*``
-    flags and any carried primary-model probability ARE eligible (they are pre-trade signals).
+    A deny-list ("every numeric column except a few ids") silently LEAKS the moment a strategy's
+    trade frame carries an outcome/level column the list doesn't name — e.g. ``ret``, ``exit_price``,
+    or the absolute ``entry_price``/``target``/``stop`` levels. Feeding those trains the meta-model
+    on the answer (OOS AUC -> 1.0, the "100% win" overfit trap this project exists to reject). So we
+    allow ONLY: the entry-day forensic families this module attaches (scale-free by design), the
+    one-hot ``candle_*`` archetypes, and explicitly-registered pre-entry signals (``_SIGNAL_COLS``).
     """
-    skip = set(_OUTCOME_COLS)
+    allowed = set(_DAILY_NUMERIC) | set(_INTRADAY_NUMERIC) | set(_SIGNAL_COLS)
     cols: list[str] = []
     for c in autopsy.columns:
-        if c in skip:
+        if c in _OUTCOME_COLS:
             continue
-        if pd.api.types.is_numeric_dtype(autopsy[c]):
+        if (c in allowed or c.startswith(_CANDLE_PREFIX)) and pd.api.types.is_numeric_dtype(autopsy[c]):
             cols.append(c)
     return cols
 
