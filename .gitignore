@@ -33,6 +33,8 @@ artifacts/
 trades*.csv
 meanrev_*.csv
 *_full.csv
+spy_*.csv
+*_capitulation_*.csv
 
 # OS / editor
 .DS_Store
