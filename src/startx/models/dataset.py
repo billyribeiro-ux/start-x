@@ -40,8 +40,10 @@ from ..labeling.config import label_horizon
 from ..labeling.weights import sample_weights
 from ..settings import Settings, get_settings
 
-#: Columns that are never features (identifiers / labels / text).
-_NON_FEATURE = ("date", "symbol", "sector", "label", "ret", "t1", "touch", "upper", "lower")
+#: Columns that are never features (identifiers / labels / targets / weights / text).
+_NON_FEATURE = (
+    "date", "symbol", "sector", "label", "ret", "t1", "touch", "upper", "lower", "y", "w",
+)
 
 #: Drop-NaN rows only while the cost stays under this fraction; else median-fill.
 _MAX_DROP_FRAC = 0.02
