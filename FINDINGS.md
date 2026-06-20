@@ -96,6 +96,31 @@ Static 18 was a trap (leaned on one lucky 2021 trade); p70-252 is the simpler ne
 drift), pre-FOMC drift (didn't persist), Santa/sell-in-May (B&H proxies), day-of-week, rates
 direction, dollar, breadth%, growth-vs-small-cap (all TRAIN→TEST collapses / 2022 artifacts).
 
+## Cross-desk stress test — Quant / ML / Mathematician / Market-Maker (2019-26)
+Four specialist agents independently stress-tested the book. They converge hard:
+- **The system's value is RISK-ADJUSTED, not alpha over the index.** Best portfolio (concurrent,
+  vol-targeted equal-risk 3%/stop + gold-calm overlay + −10% drawdown circuit-breaker): Sharpe
+  **1.43 / Calmar 1.05 / maxDD −16%** vs SPY B&H 0.85 / 0.46 / −34%, and strong in BOTH halves. But
+  raw CAGR ~ties B&H. The real edge is **diversification** (sleeve corr 0.09–0.52); book DSR 0.995.
+- **Only `momentum_breakout` has real, durable, cost-robust drift-adjusted alpha** (+0.17%,
+  P(α≤0)=0.028; fill-insensitive; durable premium = trend-chasers + disposition effect). Trust most
+  — but underpowered solo (DSR 0.46), so it lives inside the book.
+- **IBS = real, robust *pattern* but ~0 alpha** (exposure timing; dies in <1bp slippage / next-open).
+- **VIX-capitulation = likely NOISE / beta not alpha** (DSR 0.10; drift-alpha −1.22%, P(α≤0)=0.985;
+  profit lives in 5 lucky trades; the "PF 15 / 80% win" was 5 observations). **Demoted to unproven.**
+- **The earlier IBS meta-filter (84% / PF 5.12) is FRAGILE** — purged-CV AUC <0.5, PBO 0.83, inverted
+  OOS calibration. Its only honest effect is drawdown-smoothing via pooling, NOT alpha. ML take/skip
+  gates and learned/exhaustion exits do NOT beat the rules (they cut the home-runners).
+- **Chandelier 3.0 ATR exit is mathematically near-optimal & robust** (EV-optimal given median MFE
+  ≈4–5 ATR; "wider is better" is in-sample drift, not significant). **IBS should move off its fixed
+  1.5 ATR target to the chandelier** (leaves ~0.5–0.9 ATR/trade on the table now).
+- **VIX term structure does NOT rescue the short thesis** (backwardation not robustly predictive; no
+  tradeable caution) — fear extremes are bounces (4th confirmation). **NEW gauge: VVIX (vol-of-vol)
+  ≥ p90** — fwd-5d +1.3%/+1.1% TRAIN/TEST, 76% up both, partly orthogonal to spot VIX, better sample
+  (n=37 vs capitulation's 9) → a better *trigger* for the fear sleeve than spot VIX.
+- **Discarded OOS:** credit-on overlay, regime-tilt, vol-target, learned/exhaustion exits, ML
+  take/skip. Options/skew data unavailable on this FMP plan.
+
 ## Standing lessons (the ones that change how we trade)
 - **Coincident ≠ predictive.** VIX/SPX is −0.75 *same-day* — a mirror, not a forecast. The edge
   only lives in relationships that survive the shift from same-bar to next-bar. Most "obvious"
