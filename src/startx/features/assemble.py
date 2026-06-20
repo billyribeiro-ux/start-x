@@ -14,6 +14,7 @@ import pandas as pd
 
 from ..data.cache import ParquetCache
 from ..data.catalysts import load_catalysts
+from ..data.intermarket import get_context_prices
 from ..data.prices import get_prices
 from ..data.universe import Universe, load_universe
 from ..events.detect import compute_signals
@@ -21,13 +22,14 @@ from ..fmp import endpoints as ep
 from ..fmp.client import FMPClient
 from ..settings import Settings, get_settings
 from .flow import flow_features
+from .intermarket import intermarket_features
 from .regime import regime_features
 from .technical import technical_features
 
 _FWD_PREFIX = "fwd_"
 
 #: Bump whenever feature definitions change so stale cached matrices are not reused.
-FEATURE_VERSION = 2
+FEATURE_VERSION = 3
 
 
 def _drop_forward(df: pd.DataFrame) -> pd.DataFrame:
@@ -86,6 +88,11 @@ def build_feature_matrix(
     regime = regime_features(dates, bench_prices, vix_prices)
 
     matrix = tech.merge(flow, on="date", how="left").merge(regime, on="date", how="left")
+
+    # Intermarket macro context (yields/credit/sector-RS/dollar/gold) — drives index direction.
+    context = get_context_prices(client, cache, settings.history_start, refresh)
+    inter = intermarket_features(dates, context, bench_prices)
+    matrix = matrix.merge(inter, on="date", how="left")
     matrix = _drop_forward(matrix)
 
     # Clip to the requested window only at the end so trailing windows are fully warmed.
