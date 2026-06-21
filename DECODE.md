@@ -5,6 +5,44 @@ The firewall (out-of-sample, deflated Sharpe, PBO, leakage/shuffle canary) decid
 
 ---
 
+## CONSOLIDATED SCOREBOARD (all edges characterized, gathered before assembly)
+
+**The shape of the answer: there is no single oracle. There is a constellation of small, real,
+weakly-correlated edges — and the alpha is in assembling them, weighted by evidence.**
+
+### ✅ REAL, tradeable edges (each thin alone — DSR mostly 0.2–0.6 — but firewall-cleared)
+| Edge | OOS evidence | corr to equity book | role |
+|---|---|---|---|
+| **SPY swing book** (breakout/IBS/fear) | un-levered Sharpe ~1.18, maxDD −9% | 1.0 (it IS the book) | core |
+| **ML cross-sectional ranker** (4wk) | net Sharpe **0.87**, α +24.6% β−0.08, IC t 4.30, **DSR 0.63** | ~0 (market-neutral) | **best diversifier** |
+| **HMM regime-boundary capitulation** | fwd5d +0.85%, hit 72.6%, **t 3.14** (beats VIX band t 0.94) | overlaps fear sleeve | upgrade the fear trigger |
+| **Reaction-PEAD** (earnings gap-up drift) | +9–13%/yr, t 2.1, DSR 0.14–0.27, sector-neutral survives | +0.08 | thin, orthogonal |
+| **Index-inclusion drift** | +1.27% post-2010, t 3.2, DSR 0.34, ~20 events/yr | ~0 | tiny, orthogonal |
+| **Macro PPI-surprise → equities** | t up to −5.16 but DSR 0.25 after deflation | ~0 | overlay only, not primary |
+| **Stat-arb residual basket** | net Sharpe 0.57, PBO 0.26, canary p 0.02 | overlaps IBS (it's long-the-loser) | confirms mean-reversion |
+
+### ❌ MIRAGES killed by the firewall
+naive cross-sectional factors (survivorship + crash-beta) · cross-asset trend / managed-futures
+TSMOM (**dead even on deep 1998-2026 history** — the sample-starved hope failed) · credit-gated
+rotation (inverts on deep history) · classic stat-arb pairs (distance & cointegration — zero gross
+edge, post-2003 collapse confirmed) · index deletion-reversal (a GFC-outlier mirage) · analyst
+grades (decay OOS) · insider buying (leakage trap) · congress flow · most macro releases (post-2020
+regime artifacts).
+
+### 🧮 The deep verdict — how decodable is the market?
+**~38% systematic, ~62% irreducible at retail cost.** Direction & regime are decodable and
+persistent; single-name residual alpha is mostly noise once you pay to trade it. The decoded,
+tradeable structure = **regime + a market-neutral ML sleeve + a few thin event/catalyst edges** —
+NOT stock-picking, NOT one magic signal.
+
+### 🔭 The ensemble math (the path, quantified — assembly pending all results)
+Max-Sharpe (not equal-risk) weighting; each near-independent edge raises the ceiling √(ΣSRᵢ²):
+SPY book (1.18) **+ ML ranker (0.87, β≈0) → ceiling ~1.45**; + the orthogonal thin edges (PEAD,
+index, macro) nudges toward ~1.5. Realistic decoded-system target: **a ~1.45–1.55 Sharpe diversified
+ensemble** — world-class *because* it's a portfolio of real edges, not a fragile single signal.
+
+---
+
 ## Round 1 — five parallel frontiers (cross-section / catalysts / factor-regime / ML / cross-asset)
 
 ### ✅ REAL edges (cleared the firewall)
