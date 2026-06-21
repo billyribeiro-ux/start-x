@@ -72,9 +72,13 @@ def capitulation_signals(vix: pd.DataFrame, *, neutral="adaptive",
     band = vix_upper_band(v["close"], band_window, band_k)
     base = adaptive_neutral(v["close"]) if neutral == "adaptive" else float(neutral)
     above = (v["close"] > band) & (v["close"] > base)
-    # consecutive run length of `above`
-    run = above * (above.groupby((~above).cumsum()).cumcount() + 1)
-    return run == min_closes  # exactly the Nth close -> one entry per episode
+    # Consecutive run length of `above`, counted from 1 on the FIRST above-band close. Group by
+    # transitions (`above != above.shift()`) so each run is its own group — using `(~above).cumsum()`
+    # (the old idiom) folds the breaking False bar into the next run, off-by-one-ing the count (the
+    # 1st close read as 2, so an isolated single spike read as 2 and `min_closes` fired one close
+    # early). False bars are forced to 0 so they can never satisfy the threshold.
+    run = (above.groupby((above != above.shift()).cumsum()).cumcount() + 1).where(above, 0)
+    return run == min_closes  # exactly the Nth *consecutive* close -> one entry per episode
 
 
 def backtest(index_prices: pd.DataFrame, vix: pd.DataFrame, *, neutral="adaptive",

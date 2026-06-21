@@ -86,6 +86,41 @@ def test_capitulation_fires_once_on_a_sustained_spike():
     assert bool(above.iloc[idx - 1]) is True
 
 
+def _expected_fires(above: np.ndarray, n: int) -> list[int]:
+    """Ground-truth reference: indices where the consecutive-above count reaches EXACTLY n
+    (an explicit running counter, reset on every break) — independent of the module's vectorised idiom."""
+    out, c = [], 0
+    for i, a in enumerate(above):
+        c = c + 1 if a else 0
+        if c == n:
+            out.append(i)
+    return out
+
+
+def test_fires_on_exactly_the_nth_consecutive_close():
+    """REGRESSION (off-by-one): the module must fire on the bar that completes EXACTLY ``min_closes``
+    consecutive above-band closes — verified against an independent running counter. The old idiom
+    folded the breaking bar into the run and fired one close early, so it disagrees with this reference."""
+    vix, _ = _calm_then_spike(spike_len=5)
+    band = vix_upper_band(vix["close"])
+    above = ((vix["close"] > band) & (vix["close"] > VIX_NEUTRAL)).to_numpy()
+    assert _expected_fires(above, 2), "test must be non-trivial: at least a length-2 run exists"
+    for n in (2, 3, 4, 5):
+        fired = list(np.flatnonzero(capitulation_signals(vix, neutral=VIX_NEUTRAL, min_closes=n)
+                                    .fillna(False).to_numpy()))
+        assert fired == _expected_fires(above, n)
+
+
+def test_lone_spike_never_fires_even_at_min_closes_2():
+    """REGRESSION (the sharp edge of the off-by-one): an isolated single above-band close must NOT
+    fire even at ``min_closes=2``. The buggy counter read a lone spike as run==2 and fired; the
+    fixed counter reads it as run==1, so persistence is genuinely required."""
+    close = 15.0 + 0.3 * np.sin(np.arange(80))
+    close[60] = 60.0  # one violent single-day spike
+    vix = _vix_frame(close)
+    assert int(capitulation_signals(vix, neutral=VIX_NEUTRAL, min_closes=2).fillna(False).sum()) == 0
+
+
 def test_min_closes_makes_signal_more_selective():
     """Requiring more consecutive closes (larger ``min_closes``) cannot produce MORE entries than a
     looser requirement; a short spike that satisfies a low bar can fail a higher one."""

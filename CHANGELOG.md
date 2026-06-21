@@ -7,6 +7,21 @@ Evidence lives in `FINDINGS.md`; the locked study window is **Jan 2019 → Jun 2
 
 ## 2026-06-21
 
+### Fixed (correctness — the off-by-one the audit's new tests surfaced)
+- **`vix_capitulation.capitulation_signals` fired one close early.** The run-length counter grouped by
+  `(~above).cumsum()`, which folds the breaking False bar into the following run, so the FIRST
+  consecutive above-band close was counted as 2 — `min_closes=3` fired on the 2nd close, and an
+  *isolated single spike* counted as run==2 (would fire at `min_closes=2`, defeating the "persistent"
+  thesis). Fixed to transition-based grouping (`(above != above.shift()).cumsum()`, False bars forced
+  to 0) so the run counts 1,2,3,… from the first close; `min_closes=3` now fires on exactly the 3rd
+  consecutive close, matching the documented thesis. Verified numerically and locked with 2 regression
+  tests **proven to fail on the old counter and pass on the new** (by injecting the old line).
+- **Blast radius — contained (hard evidence).** `capitulation_signals` is NOT wired into any locked
+  book: System #2's fear sleeve uses `volatility_premium.fear_signals` (no such counter), and the only
+  other references are the module's own research `backtest()`, a `validate.py` scorecard, and a
+  `thesis.py` import of the *separate* `adaptive_neutral`. So **System #1/#2 locked numbers are
+  unchanged** — this is a research-module correctness fix, not a locked-system change.
+
 ### Audit sweep — 6 parallel Opus agents (verify-with-evidence, then fix only what's real)
 An external code audit was run claim-by-claim; each was reproduced before any fix, and false alarms
 were left untouched. Full suite **109 → 139 tests** (30 new), all green.
