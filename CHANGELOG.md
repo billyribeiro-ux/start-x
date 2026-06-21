@@ -7,6 +7,14 @@ Evidence lives in `FINDINGS.md`; the locked study window is **Jan 2019 → Jun 2
 
 ## 2026-06-21
 
+### Docs — recommendations captured
+- **`ROADMAP.md` now leads with a dated, priority-ordered "next improvements" list** (hardest-evidence
+  first): calibrate & lock System #2 (long_swing) and #3 (position); walk-forward the *parameters*
+  (cap/threshold/ATR mults) with a multiple-testing-deflated Sharpe; add SPX/QQQ/IWM for sample size;
+  emit per-trade MFE/MAE excursion from the engine; re-stream the ensemble on the three CLEAN books;
+  honest per-book cost/execution; a regime-sizing overlay. Stale RSI-2 backlog item marked superseded
+  by IBS<0.1 (System #1).
+
 ### Changed (architecture — THREE horizon-separated books, user-directed)
 - **The mixed book is split into three separate systems, one per holding horizon.** Jamming a
   1-10 day dip and a multi-month trend ride into ONE book under ONE exit rule is exactly what
