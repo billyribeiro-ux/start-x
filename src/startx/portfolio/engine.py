@@ -124,7 +124,7 @@ def run_portfolio(
     port_risk_cap: float = 0.12,
     gross_cap: float = 3.0,
     atr_mult: float = 3.0,
-    max_days: int = 40,
+    max_days: int = 252,
     cost_bps: float = 2.0,
     gold_calm: bool = True,
     dd_breaker: float = 0.10,
@@ -151,7 +151,10 @@ def run_portfolio(
     atr_mult:
         Chandelier / initial-stop ATR multiple (default 3.0).
     max_days:
-        Time-cap on a trade in trading days (default 40).
+        Far-back SAFETY backstop in trading days (default 252 ≈ 1yr). The chandelier is the real
+        exit — a short cap (e.g. 40) force-chops still-trending winners mid-move and, because the
+        sleeve frees up the same bar, manufactures an immediate same-price re-entry (churn). Keep
+        this large so the trail does the exiting; "don't cut home-runners".
     cost_bps:
         Round-trip transaction cost in basis points, charged once per trade on the return.
     gold_calm:
@@ -217,6 +220,7 @@ def run_portfolio(
 
     for i in range(n):
         day = dates.iloc[i]
+        exited_today: set[str] = set()  # a sleeve that exits today cannot re-enter today (no churn)
 
         # 1) EXITS FIRST — chandelier trail or time cap. Freed risk budget is reusable today.
         still_open: list[_OpenTrade] = []
@@ -246,6 +250,7 @@ def run_portfolio(
             hwm = max(hwm, equity)
             rows.append(_ledger_row(t, day, exit_price, exit_reason, i, net_ret, cost))
             open_sleeves.discard(t.sleeve)
+            exited_today.add(t.sleeve)
         open_trades = still_open
 
         # 2) capacity used by the survivors (concurrent risk + gross), for sizing new trades
@@ -262,6 +267,8 @@ def run_portfolio(
             for name in sleeves:
                 if name in open_sleeves:
                     continue  # one open position per sleeve
+                if name in exited_today:
+                    continue  # exited this bar -> no same-day same-price re-entry (churn guard)
                 if i not in entry_idx_by_sleeve[name]:
                     continue
                 av = atr_abs[i]
