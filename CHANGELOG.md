@@ -7,6 +7,48 @@ Evidence lives in `FINDINGS.md`; the locked study window is **Jan 2019 → Jun 2
 
 ## 2026-06-21
 
+### Audit sweep — 6 parallel Opus agents (verify-with-evidence, then fix only what's real)
+An external code audit was run claim-by-claim; each was reproduced before any fix, and false alarms
+were left untouched. Full suite **109 → 139 tests** (30 new), all green.
+- **Test inversion (ACCURATE → fixed).** The abandoned `prob_up` model had 23 tests; the two
+  *trusted* edges had zero. Added `tests/test_mean_reversion.py` (9) and `tests/test_vix_capitulation.py`
+  (8) exercising `ibs`/`ibs_signals`/`mean_reversion_signals`/`rsi` and `vix_upper_band`/
+  `capitulation_signals`/`adaptive_neutral`.
+- **Cache truncation + no TTL (ACCURATE → fixed).** `data/cache.py` keys carried no date range, so a
+  cache first filled with a short window was served verbatim for a later WIDER request (repro: asked
+  2010-start, silently got 2019-start). Added a coverage check + `max_age` TTL as **keyword-only,
+  backward-compatible** opt-ins, plus a sidecar `*.meta.json`; `tests/test_cache.py` (8). Residual
+  one-liner: `prices.py` should pass its requested range to opt in (noted in the docstring).
+- **Fresh-cache failure (ACCURATE → fixed).** `run_book.py` loads `_VIX`/`_VVIX`/`GLD`, but
+  `universe.yaml` declared only VIX and `backfill.py` never warmed the `context:` series → a clean
+  checkout raised `FileNotFoundError`. Added VVIX/GLD to `universe.yaml` and a context-warming loop in
+  `backfill.py` writing the exact sanitized filenames (`^VIX`→`_VIX.parquet`, …).
+- **Dashboard (ACCURATE → fixed conservatively).** Git history confirms pages 1-3 were never built
+  (not deleted) and nothing imports the page files; added `pages/README.md` documenting the numbering
+  instead of risky renumbering. `7_Self_Learning.py` is synthetic-data only (real `autopsy_trades`
+  imported but never called) → added a prominent in-app SYNTHETIC-DATA-DEMO `st.warning`.
+- **Hardcoded path (ACCURATE → fixed).** `highconf_eval.py` default `--out` was an absolute
+  `/home/user/...` path; now repo-relative via `Path(__file__).resolve().parents[1]` (identical when
+  run from root).
+- **`cpcv.build_paths` return-type mismatch (ACCURATE → fixed).** Annotation said `list[list[int]]`
+  but it returns `list[list[tuple[int,int]]]`; corrected annotation + docstring + a contract
+  regression test. (Method is unused but a tested public API — kept, not deleted.)
+- **market_internals survivorship (REFINED — half false).** The scary half ("the `dateFirstAdded`
+  gate is fake / silently uses today's list") is **INACCURATE**: the add-gate is genuinely enforced
+  and effective (proven on cache — effective constituent count rises 389→502 across 2019→2026). The
+  real, *already-self-flagged* half is the missing delisted/`dateRemoved` side (no vendor feed on this
+  plan) → now an honest runtime `RuntimeWarning` (env-silenceable) + precise docstring instead of an
+  overselling one-liner; `tests/test_market_internals_survivorship.py` (4).
+- **FALSE ALARMS (verified INACCURATE → no change).** (1) "Double-costing in
+  `validate.normalize_ledger`" — cost is charged exactly once in both the `ret` and price branches
+  (numeric repro 0.0198 either way). (2) "`backtest/sizing.py:vol_target` is dead code" — it's
+  exported public API covered by 13 backtest tests.
+- **🔴 New bug found mid-verification (FLAGGED, not auto-fixed).** `vix_capitulation.capitulation_signals`
+  fires on the **2nd** consecutive above-band close, not the 3rd, despite the documented "≥3
+  consecutive closes" (run-length counter shares the leading non-above bar's group). This changes a
+  **locked** book's behavior (System #2 fear sleeve), so it needs its own fix + re-validation cycle
+  before changing — not folded into this audit batch.
+
 ### Calibrated & locked — System #2: long_swing (4 parallel Opus agents)
 - **long_swing (breakout + fear, weeks→~3 months) is locked at max_days = 63** and OOS-validated by a
   4-agent drill (cap-sweep / ledger-integrity / sleeve-decomposition / overfit-firewall):

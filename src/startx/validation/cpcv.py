@@ -107,12 +107,12 @@ class CombinatorialPurgedCV:
 
     def build_paths(
         self, X, predictions: list[tuple[np.ndarray, np.ndarray]] | None = None,
-    ) -> list[list[int]]:
+    ) -> list[list[tuple[int, int]]]:
         """Map split index -> which path each test group contributes to.
 
         Returns a list of length :attr:`n_paths`; entry ``p`` is the ordered
-        list of ``(split_idx, group_id)`` encoded as a flat list describing
-        which (combination, group) draws form path ``p``. This reassembles one
+        list of ``(split_idx, group_id)`` pairs describing which
+        (combination, group) draws form path ``p``. This reassembles one
         OOS prediction per group into a coherent full-sample path, as required
         by PBO. ``predictions`` is accepted for API symmetry but the assignment
         depends only on the combinatorial structure.

@@ -101,6 +101,13 @@ test_span = st.sidebar.slider("Forward block size", 5, 60, 20, 5)
 
 # -- main ------------------------------------------------------------------
 st.title("Self-Learning — loss autopsy + point-in-time meta gate")
+st.warning(
+    "**SYNTHETIC-DATA DEMO.** Every number on this page is computed from a deterministic, "
+    "randomly generated trade ledger (`_synthetic_autopsy`), controlled by the sidebar sliders — "
+    "**not** live or backtested results. The `startx.learning` analytics are real; only the input "
+    "ledger is fake. Swap in `autopsy_trades(live_trades, prices_by)` to run it on a real book.",
+    icon="⚠️",
+)
 st.caption("Autopsy services come from `startx.learning`; this page only wires inputs to them. "
            "Replace the synthetic ledger with `autopsy_trades(live_trades, prices_by)` for live "
            "books — the analytics are identical.")

@@ -9,6 +9,7 @@ import sys
 from datetime import date, timedelta
 
 from startx.data.cache import ParquetCache
+from startx.data.prices import get_prices
 from startx.data.universe import load_universe
 from startx.events.engine import analyze_symbol
 from startx.fmp.client import FMPClient
@@ -40,6 +41,19 @@ def main() -> None:
                 print(f"  {ticker:5s} {len(ev):3d} events  (↑{ups} ↓{downs}){top}")
             except Exception as exc:  # noqa: BLE001
                 print(f"  {ticker:5s} FAILED: {exc}")
+
+        # Context series (not traded, no catalysts) — warm the raw price history so a fresh cache
+        # has them. get_prices writes key "prices/<fmp>", which the cache sanitizes to
+        # data/cache/prices/<fmp-with-^->_>.parquet — the exact filename run_book.py reads
+        # (^VIX -> _VIX, ^VVIX -> _VVIX, GLD -> GLD).
+        if universe.context:
+            print(f"\nContext series: {', '.join(universe.context)}")
+            for name, fmp in universe.context.items():
+                try:
+                    px = get_prices(client, cache, fmp, settings.history_start)
+                    print(f"  {name:5s} ({fmp}) {len(px):4d} bars")
+                except Exception as exc:  # noqa: BLE001
+                    print(f"  {name:5s} ({fmp}) FAILED: {exc}")
     print("\nDone. Launch the dashboard:  streamlit run src/startx/dashboard/app.py")
 
 

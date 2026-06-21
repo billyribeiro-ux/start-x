@@ -12,14 +12,25 @@ Worked example (2026-03): the fear sleeves fired on BOTH flushes, but only one w
 :func:`washout_signals` encodes exactly that: only confirm a fear/dip long when breadth shows the
 selling is genuinely exhausted.
 
-Point-in-time: every threshold is a *trailing* rolling quantile; membership is gated by each name's
-``dateFirstAdded`` (a stock counts only once it joined the index). Caveat: we use the *current* 503
-names, so removed/delisted constituents are absent — a mild survivorship bias, acceptable for the
-2019→now window and flagged honestly.
+Point-in-time — what IS and ISN'T enforced (be precise, don't oversell it):
+  • ENFORCED (genuine, effective): every threshold is a *trailing* rolling quantile, and the
+    "joined" edge is gated by each name's ``dateFirstAdded`` — a stock contributes to breadth only
+    on/after the session it entered the index (see the ``mask`` built in :func:`compute_internals`).
+    This is a real filter: ~114 of the current 503 joined after 2019-01-01, and their pre-membership
+    history is correctly excluded rather than back-projected.
+  • NOT ENFORCED (known data limitation, NOT silently hidden): we iterate the *current* constituent
+    list only, so names that were **removed/delisted** over the window are absent, and we have no
+    ``dateRemoved`` field to gate the "left the index" edge. That is a one-sided survivorship bias:
+    breadth is computed over today's survivors. It is mild on the 2019→now S&P (turnover ~20–25
+    names/yr, mostly small) but it is real. We do NOT fabricate historical constituents to paper
+    over it; :func:`compute_internals` emits a runtime warning so no caller mistakes this for a
+    fully point-in-time panel. Fixing it properly needs a vendor historical-membership feed
+    (``dateRemoved`` / a dated add/drop log), which the current FMP plan does not provide.
 """
 from __future__ import annotations
 
 import os
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -47,8 +58,26 @@ def _constituents(client=None) -> pd.DataFrame:
     return df
 
 
+#: One ``dateFirstAdded`` add-gate is enforced (see module docstring); the missing
+#: ``dateRemoved`` / delisted side is a known, unfixable-here survivorship bias we warn about
+#: rather than hide. Set ``STARTX_SILENCE_SURVIVORSHIP=1`` to mute the per-process warning.
+_SURVIVORSHIP_WARNING = (
+    "market_internals: breadth is built from the CURRENT S&P 500 constituents only. The "
+    "`dateFirstAdded` add-gate IS applied, but removed/delisted names are absent (no `dateRemoved` "
+    "feed on this FMP plan) -> one-sided survivorship bias. Mild on 2019->now; do NOT treat this "
+    "panel as fully point-in-time. Set STARTX_SILENCE_SURVIVORSHIP=1 to silence."
+)
+
+
 def compute_internals(client=None) -> pd.DataFrame:
-    """Build the daily internals from the constituent price panel. Point-in-time membership gate."""
+    """Build the daily internals from the constituent price panel.
+
+    Point-in-time membership is gated on the ``dateFirstAdded`` (joined) edge only; the
+    removed/delisted edge is NOT gated (current-survivors panel) — see the module docstring and the
+    runtime warning. This is an honest, one-sided survivorship limitation, not a silent one.
+    """
+    if not os.environ.get("STARTX_SILENCE_SURVIVORSHIP"):
+        warnings.warn(_SURVIVORSHIP_WARNING, RuntimeWarning, stacklevel=2)
     members = _constituents(client)
     closes, highs, lows, vols = {}, {}, {}, {}
     for sym in members["symbol"]:

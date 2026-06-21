@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import warnings
+from pathlib import Path
 
 warnings.filterwarnings("ignore")
 
@@ -55,6 +56,12 @@ def _enrich(symbol, trades, prices, horizon):
     return t[cols]
 
 
+# Repo root = one parent up from this file (scripts/highconf_eval.py); keeps the default
+# output path repo-relative and identical to running from the repo root.
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+_DEFAULT_OUT = _REPO_ROOT / "spy_spx_highconf_trades.csv"
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--tickers", default="SPY,SPX")
@@ -65,7 +72,7 @@ def main() -> None:
     ap.add_argument("--prob", type=float, default=0.80)
     ap.add_argument("--n-trials", type=int, default=12, dest="n_trials",
                     help="honest count of configs tried, for the deflated-Sharpe penalty")
-    ap.add_argument("--out", default="/home/user/start-x/spy_spx_highconf_trades.csv")
+    ap.add_argument("--out", default=str(_DEFAULT_OUT))
     args = ap.parse_args()
 
     settings = get_settings()

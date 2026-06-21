@@ -155,6 +155,35 @@ def test_cpcv_assemble_oos_covers_sample():
         np.testing.assert_array_equal(path.to_numpy(), np.arange(n, dtype=float))
 
 
+def test_cpcv_build_paths_return_type_contract():
+    """build_paths returns list[list[tuple[int, int]]] matching its annotation.
+
+    Regression for the previous ``-> list[list[int]]`` mismatch: every entry is
+    a ``(split_idx, group_id)`` *pair*, each path covers every group exactly
+    once, and the named split genuinely holds that group as a test block.
+    """
+    n, n_groups, k = 60, 5, 2
+    X, _y, t1 = make_overlapping(n=n, span=3)
+    cv = CombinatorialPurgedCV(n_groups=n_groups, n_test_groups=k, t1=t1,
+                               embargo_pct=0.0)
+
+    combos = list(combinations(range(n_groups), k))
+    paths = cv.build_paths(X)
+
+    assert len(paths) == cv.n_paths
+    for path in paths:
+        # each path assigns exactly one split to every group
+        assert len(path) == n_groups
+        assert sorted(g for _s, g in path) == list(range(n_groups))
+        for entry in path:
+            # contract: a 2-tuple of ints, NOT a bare int
+            assert isinstance(entry, tuple) and len(entry) == 2
+            split_idx, group_id = entry
+            assert isinstance(split_idx, int) and isinstance(group_id, int)
+            # the referenced split must actually test that group
+            assert group_id in combos[split_idx]
+
+
 # --------------------------------------------------------------------------- #
 # 3. Deflated Sharpe — white noise + many trials => low DSR => overfit verdict
 # --------------------------------------------------------------------------- #

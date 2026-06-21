@@ -12,6 +12,10 @@ symbols:
   NVDA: { fmp: "NVDA",   type: stock,     name: "NVIDIA Corp." }
   AAPL: { fmp: "AAPL",   type: stock,     name: "Apple Inc." }
 
-# Extra series pulled for context (not traded)
+# Extra series pulled for context (not traded). Warmed into data/cache/prices/<file>.parquet by
+# backfill; the on-disk filename is the FMP symbol sanitized (^ -> _), so ^VIX -> _VIX.parquet,
+# ^VVIX -> _VVIX.parquet, GLD -> GLD.parquet — exactly what run_book.py loads.
 context:
-  VIX: { fmp: "^VIX", name: "CBOE Volatility Index" }
+  VIX:  { fmp: "^VIX",  name: "CBOE Volatility Index" }
+  VVIX: { fmp: "^VVIX", name: "CBOE VVIX (vol-of-vol)" }
+  GLD:  { fmp: "GLD",   name: "SPDR Gold Shares ETF" }
