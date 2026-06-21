@@ -63,20 +63,54 @@ MODELS = {
     "guarded": {"breakout": _breakout, "ibs": _ibs_guarded, "fear": _fear},
 }
 
+#: Per-sleeve exit = (HARD STOP ATR mult, CHANDELIER ATR mult, MAX hold in trading days).
+#: Rule: 1-ATR hard stop cuts the loss short; 3-ATR chandelier rides the winner. Horizon differs by
+#: sleeve — a short-term dip vs a long-term trend/capitulation ride. One global exit is wrong.
+EXITS = {
+    "breakout": (1.0, 3.0, 252),   # long-term trend: 1-ATR stop, 3-ATR trail, ride for months
+    "fear":     (1.0, 3.0, 90),    # capitulation bounce: 1-ATR stop, 3-ATR trail, weeks-to-a-quarter
+    "ibs":      (1.0, 3.0, 10),    # SHORT-TERM dip (1-10d): 1-ATR stop, 3-ATR trail, ~2-week hard cap
+}
 
-_LEDGER_COLS = ["model", "sleeve", "entry_date", "entry_price", "stop_price", "exit_date",
-                "exit_price", "exit_reason", "bars_held", "weight", "ret", "pnl_contrib",
-                "regime", "conviction", "thesis", "outcome"]
+
+#: Exact ENTRY criteria per sleeve, in plain English (the spec — see STRATEGY.md for full detail).
+SLEEVE_RULES = {
+    "breakout": "ENTRY: SPY closes at a NEW 20-day high while above its 200-day SMA (fresh trend breakout).",
+    "ibs": "ENTRY: IBS<0.10 — close in the bottom 10% of the day's range, above the 200-day SMA "
+           "(oversold dip in an uptrend); guarded model also requires up-volume >20% (no falling knife).",
+    "fear": "ENTRY: VRP (VIX − 20d realized vol) in the top 5% of its trailing year, OR VVIX ≥ its "
+            "trailing-year 90th pct (fear over-priced → bounce).",
+}
+
+_LEDGER_COLS = ["model", "sleeve", "entry_date", "entry_price", "stop_price", "stop_pct",
+                "exit_date", "exit_price", "exit_reason", "bars_held", "ret", "pnl_contrib",
+                "entry_rule", "exit_rule", "regime", "conviction", "thesis", "outcome"]
+
+
+def _enrich_logic(led: pd.DataFrame) -> pd.DataFrame:
+    """Make every trade self-documenting: spell out its entry rule, stop %, and exit rule."""
+    if led.empty:
+        return led
+    led = led.copy()
+    led["entry_rule"] = led["sleeve"].map(SLEEVE_RULES)
+    led["stop_pct"] = ((led["stop_price"] / led["entry_price"] - 1.0) * 100).round(2)
+
+    def _exit_rule(sl: str) -> str:
+        sm, cm, md = EXITS.get(sl, (1.0, 3.0, 252))
+        return (f"EXIT: {cm:.0f}-ATR chandelier trail (ride the winner) + {sm:.0f}-ATR hard stop "
+                f"(cut the loss); hard cap {md} trading days.")
+    led["exit_rule"] = led["sleeve"].map(_exit_rule)
+    return led
 
 
 def _run_one(name, sleeves, spy, aux, start, end, out):
-    res = run_portfolio(spy, aux, sleeves, start=start, end=end)
+    res = run_portfolio(spy, aux, sleeves, exits=EXITS, start=start, end=end)
     s = res.stats
     print(f"\n=== MODEL: {name} ===")
     print(f"  n={s['n']} win={s['win_rate']*100:.0f}% total={s['total_return']*100:+.1f}% "
           f"maxDD={s['max_drawdown']*100:.1f}% PF={s['profit_factor']:.2f} "
           f"Sharpe={s.get('ann_sharpe', float('nan')):.2f} exposure={s.get('exposure', 0)*100:.0f}%")
-    led = annotate_theses(res.ledger, spy, aux)
+    led = _enrich_logic(annotate_theses(res.ledger, spy, aux))
     led.insert(0, "model", name)
     print("  BOOK NOW:", summarize_book(led))
     if out:
@@ -95,7 +129,7 @@ def _stress_grid(spy, aux, names):
     print(f"  {'window':22}{'model':9}{'n':>4}{'win':>6}{'total':>9}{'PF':>7}{'maxDD':>8}{'Sharpe':>8}")
     for wl, st, en in windows:
         for m in names:
-            s = run_portfolio(spy, aux, MODELS[m], start=st, end=en).stats
+            s = run_portfolio(spy, aux, MODELS[m], exits=EXITS, start=st, end=en).stats
             print(f"  {wl:22}{m:9}{s['n']:4}{s['win_rate']*100:5.0f}%{s['total_return']*100:+8.1f}%"
                   f"{s['profit_factor']:7.2f}{s['max_drawdown']*100:7.1f}%{s.get('ann_sharpe', 0):8.2f}")
 

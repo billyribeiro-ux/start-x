@@ -110,6 +110,8 @@ class _OpenTrade:
     risk_frac: float          # fractional distance to the initial stop = atr_mult*atr_pct
     peak: float               # running peak high since entry (for the chandelier trail)
     last_day: int             # entry_idx + max_days (inclusive time cap)
+    stop_mult: float          # hard-stop ATR multiple (1 ATR — cut the loss short)
+    chand_mult: float         # trailing-chandelier ATR multiple (3 ATR — ride the winner)
 
 
 # --------------------------------------------------------------------------------------- #
@@ -128,6 +130,7 @@ def run_portfolio(
     cost_bps: float = 2.0,
     gold_calm: bool = True,
     dd_breaker: float = 0.10,
+    exits: Mapping[str, tuple[float, float, int]] | None = None,  # name -> (stop_mult, chand_mult, max_days)
     start: str | pd.Timestamp | None = None,
     end: str | pd.Timestamp | None = None,
 ) -> PortfolioResult:
@@ -230,13 +233,18 @@ def run_portfolio(
                 still_open.append(t)
                 continue
             t.peak = max(t.peak, highs[i])
-            chand = t.peak - atr_mult * t.atr_at_entry
+            # Two exits: a HARD STOP at entry - stop_mult*ATR (cut the loss short, e.g. 1 ATR) and a
+            # trailing CHANDELIER at peak - chand_mult*ATR (ride the winner, e.g. 3 ATR). The binding
+            # level is the higher of the two: the hard stop holds until the trade has run far enough
+            # that the 3-ATR trail lifts above it (peak > entry + (chand-stop)*ATR), then the trail
+            # takes over.
+            hard = t.entry_price - t.stop_mult * t.atr_at_entry
+            chand = t.peak - t.chand_mult * t.atr_at_entry
+            stop_level = max(hard, chand)
             exit_price = exit_reason = None
-            if lows[i] <= chand:
-                # Conservative fill: the trail level (could gap below, but close-to-close
-                # convention treats the stop as the fill — matches the sleeve backtests).
-                exit_price = chand
-                exit_reason = "chandelier" if t.peak > t.entry_price else "stop"
+            if lows[i] <= stop_level:
+                exit_price = stop_level
+                exit_reason = "chandelier" if chand >= hard else "stop"
             elif i >= t.last_day:
                 exit_price = closes[i]
                 exit_reason = "time"
@@ -278,8 +286,14 @@ def run_portfolio(
                     continue
                 if entry_price in opened_prices_today:
                     continue  # de-dup: another sleeve already opened this exact bar/price (no stacking)
+                # per-sleeve exit: (stop_mult ATR hard stop, chand_mult ATR trailing chandelier,
+                # max_days hold). Short-term sleeves (IBS dip) get a short cap; trend/capitulation
+                # sleeves ride for months. Defaults keep the legacy single-trail behaviour.
+                stop_mult, chand_mult, mdays = (exits or {}).get(name, (atr_mult, atr_mult, max_days))
                 atr_pct = av / entry_price
-                risk_frac = atr_mult * atr_pct  # fractional distance to the initial stop
+                # Size on the chandelier distance so leverage stays ~unchanged; the tighter hard stop
+                # only REDUCES realised loss per trade (max ~stop_mult ATR), it doesn't lever up.
+                risk_frac = chand_mult * atr_pct
                 if risk_frac <= 0:
                     continue
                 # vol-target: weight so this trade's risk == risk_per_trade of equity
@@ -289,11 +303,12 @@ def run_portfolio(
                                  port_risk_cap, gross_cap)
                 if w <= 0:
                     continue
-                stop_price = entry_price - atr_mult * av
+                stop_price = entry_price - stop_mult * av  # the HARD stop (recorded for review)
                 open_trades.append(_OpenTrade(
                     sleeve=name, entry_idx=i, entry_date=day, entry_price=entry_price,
                     atr_at_entry=av, stop_price=stop_price, weight=w, risk_frac=risk_frac,
-                    peak=entry_price, last_day=min(i + max_days, n - 1)))
+                    peak=entry_price, last_day=min(i + mdays, n - 1),
+                    stop_mult=stop_mult, chand_mult=chand_mult))
                 open_sleeves.add(name)
                 opened_prices_today.add(entry_price)
                 used_risk += risk_frac * w

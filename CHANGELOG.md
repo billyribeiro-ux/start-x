@@ -7,7 +7,19 @@ Evidence lives in `FINDINGS.md`; the locked study window is **Jan 2019 → Jun 2
 
 ## 2026-06-21
 
-### Added
+### Changed (exit logic — user-directed)
+- **Per-sleeve exits + the explicit stop/target rule** (user-found): the engine was applying ONE
+  exit (3-ATR stop, 252-day cap) to every sleeve regardless of horizon — wrong for the short-term
+  IBS dip (it got a 3.25% / $23 stop and a one-year hold). Now each sleeve carries
+  `(hard-stop ATR, chandelier ATR, max-hold)`: **1-ATR hard stop to cut the loss, 3-ATR chandelier
+  to ride the winner**, with breakout 252d / fear 90d / **IBS 10d**. The 2026-05-01 IBS stop went
+  from 697.26 (3 ATR) to **712.85 (1 ATR, −1.08%)**; IBS holds are capped at 10 days while breakout
+  still rides 134. Realised loss per trade is now ≤1 ATR (lower drawdown).
+
+### Added (transparency — user-directed)
+- **Every trade is self-documenting.** Ledger now carries `entry_rule`, `exit_rule`, `stop_price`,
+  `stop_pct` columns, and a full spec doc **`STRATEGY.md`** gives the exact ENTRY/EXIT/SIZING logic
+  of every sleeve in plain English. ("I shouldn't have to ask" — now you don't.)
 - **Two models kept side by side** (`scripts/run_book.py --model base|guarded|both`, default `both`)
   so the breadth guard is judged head-to-head, not by assertion: **base** = IBS dip ungated;
   **guarded** = IBS dip breadth-guarded. `--out` writes one CSV per model; a head-to-head table
