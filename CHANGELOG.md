@@ -7,6 +7,24 @@ Evidence lives in `FINDINGS.md`; the locked study window is **Jan 2019 → Jun 2
 
 ## 2026-06-21
 
+### Added / Changed (parallel drill — 3 Opus agents)
+- **Leverage drill → default gross_cap 3.0×→1.5×.** Sharpe is invariant to leverage (1.18→1.21 from
+  1×→3×) — leverage only amplifies. maxDD scales sub-linearly and the cap rarely binds (mean
+  in-market gross 0.74→1.07× as cap 1→3; ~90% of days ≤1.0×). 1.5× is the Calmar peak; 1.0× is the
+  un-levered product: **8.8% CAGR / −9.1% maxDD / Sharpe 1.18 / Calmar 0.96 vs SPY 15.8% / −34.1% /
+  0.85 / 0.46** — half the return, a quarter of the drawdown. `--gross-cap` flag (default 1.5).
+- **Entry-fill realism (`--entry-fill close|next_open`).** Book edge SURVIVES next-open execution
+  (Sharpe/PF/maxDD ~unchanged, OOS too) — it's trend-capture, not entry precision. BUT every sleeve
+  buys a +3–8 bp overnight gap-up, so per-trade drift-adjusted alpha goes negative under next-open
+  (IBS −0.16% t=−2.01; breakout mildly negative). Entry signals have no standalone edge off the
+  close print — caps any attempt to scale entry frequency / shorten holds.
+- **R-multiple journal columns** (`risk_pct`, `R`) on every trade. Expectancy **+1.12R (base) /
+  +1.28R (guarded)**; avg win +3.4R, avg loss −1.0R; losers cluster at −1R, gap-throughs the only
+  tail past it (worst −2.84R, the COVID gap). `mfe_R`/`mae_R` not added — engine ledger doesn't emit
+  excursion (honest skip, not fabricated).
+- **Final book @ 1.5× (both models, 2019-26):** base +111.8% / PF 3.05 / −12.8% / Sharpe 0.77;
+  guarded +110.2% / PF 3.51 / −11.3% / Sharpe 0.79.
+
 ### Fixed (realism — ledger audit)
 - **Gap-aware fills.** A ledger audit found 13 trades filling OUTSIDE the exit day's range: stops
   were filled at the exact stop level even when the bar GAPPED through it, overstating winners and

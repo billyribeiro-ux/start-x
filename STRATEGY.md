@@ -73,8 +73,16 @@ Mechanically, each open trade tracks two levels off ATR(14) at entry:
 
 - **Concurrent, vol-targeted sizing.** Each position is sized so its risk ≈ **3% of equity** (sized
   on the chandelier distance, so the tighter 1-ATR hard stop only *reduces* realised loss). Caps:
-  concurrent summed risk ≤ **12%**, summed gross ≤ **3.0×**; a new trade scales down to fit or is
-  skipped.
+  concurrent summed risk ≤ **12%**, summed gross ≤ **1.5×** (default; `--gross-cap`). The leverage
+  drill found 1.5× is the Calmar sweet spot and Sharpe is invariant to leverage (3× just amplifies
+  P&L and deepens drawdown); **1.0× is the genuine un-levered product** — ~8.8% CAGR / −9% maxDD /
+  Sharpe 1.18, beating SPY buy-and-hold on every risk-adjusted measure while making ~half its CAGR.
+- **Reading the journal (R-multiples).** Every trade carries `risk_pct` (the 1-ATR risk distance,
+  the R unit) and `R` (realised return in R units). The book's shape: **lose ~1R, win ~3.4R, win
+  ~half the time → ≈ +1.1–1.3 R/trade.** Gap-throughs are the only losers worse than −1R.
+- **Execution realism.** Entries fill at the signal-day close by default (`--entry-fill`); the book's
+  edge SURVIVES next-open fills at the portfolio level (it's trend-capture, not entry precision) —
+  but per-trade the entry signals have no standalone edge once you can't trade the close print.
 - **Gold-calm overlay.** No NEW entries on days **GLD/SPY is above its 20-day SMA** (gold leading the
   index = risk-off / flight-to-safety). The single biggest out-of-sample risk improver.
 - **Drawdown circuit-breaker.** While equity is below **peak × (1 − 10%)**, the weight of new entries

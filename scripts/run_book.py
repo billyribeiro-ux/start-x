@@ -115,8 +115,9 @@ def _enrich_logic(led: pd.DataFrame) -> pd.DataFrame:
     return led
 
 
-def _run_one(name, sleeves, spy, aux, start, end, out):
-    res = run_portfolio(spy, aux, sleeves, exits=EXITS, start=start, end=end)
+def _run_one(name, sleeves, spy, aux, start, end, out, gross_cap, entry_fill):
+    res = run_portfolio(spy, aux, sleeves, exits=EXITS, gross_cap=gross_cap,
+                        entry_fill=entry_fill, start=start, end=end)
     s = res.stats
     print(f"\n=== MODEL: {name} ===")
     print(f"  n={s['n']} win={s['win_rate']*100:.0f}% total={s['total_return']*100:+.1f}% "
@@ -132,7 +133,7 @@ def _run_one(name, sleeves, spy, aux, start, end, out):
     return s, led
 
 
-def _stress_grid(spy, aux, names):
+def _stress_grid(spy, aux, names, gross_cap, entry_fill):
     """Both models across regimes, so their regime-dependence is visible at a glance."""
     windows = [("2019-22 (incl. bear)", "2019-01-01", "2022-12-31"),
                ("2023-26 (bull)", "2023-01-01", "2026-06-19"),
@@ -141,7 +142,8 @@ def _stress_grid(spy, aux, names):
     print(f"  {'window':22}{'model':9}{'n':>4}{'win':>6}{'total':>9}{'PF':>7}{'maxDD':>8}{'Sharpe':>8}")
     for wl, st, en in windows:
         for m in names:
-            s = run_portfolio(spy, aux, MODELS[m], exits=EXITS, start=st, end=en).stats
+            s = run_portfolio(spy, aux, MODELS[m], exits=EXITS, gross_cap=gross_cap,
+                              entry_fill=entry_fill, start=st, end=en).stats
             print(f"  {wl:22}{m:9}{s['n']:4}{s['win_rate']*100:5.0f}%{s['total_return']*100:+8.1f}%"
                   f"{s['profit_factor']:7.2f}{s['max_drawdown']*100:7.1f}%{s.get('ann_sharpe', 0):8.2f}")
 
@@ -154,6 +156,10 @@ def main() -> None:
     ap.add_argument("--model", default="both", choices=["base", "guarded", "both"])
     ap.add_argument("--out", default=None, help="write the annotated ledger(s) to this CSV")
     ap.add_argument("--stress", action="store_true", help="print the models × regimes stress grid")
+    ap.add_argument("--gross-cap", type=float, default=1.5, dest="gross_cap",
+                    help="max concurrent gross leverage (leverage drill: 1.5x sweet spot, 1.0x un-levered)")
+    ap.add_argument("--entry-fill", default="close", choices=["close", "next_open"], dest="entry_fill",
+                    help="fill entries at the signal-day close (default) or the next bar's open")
     args = ap.parse_args()
 
     spy = _load("SPY"); spy.attrs["symbol"] = "SPY"
@@ -161,10 +167,12 @@ def main() -> None:
            "internals": load_internals()}
 
     names = ["base", "guarded"] if args.model == "both" else [args.model]
-    print(f"PRODUCTION BOOK  {args.start} -> {args.end}  (models: {', '.join(names)})")
+    print(f"PRODUCTION BOOK  {args.start} -> {args.end}  "
+          f"(models: {', '.join(names)} | gross_cap {args.gross_cap}x | entry {args.entry_fill})")
     stats, ledgers = {}, []
     for n in names:
-        s, led = _run_one(n, MODELS[n], spy, aux, args.start, args.end, args.out)
+        s, led = _run_one(n, MODELS[n], spy, aux, args.start, args.end, args.out,
+                          args.gross_cap, args.entry_fill)
         stats[n] = s; ledgers.append(led)
 
     if len(names) == 2:
@@ -183,7 +191,7 @@ def main() -> None:
         print(f"\nwrote {len(comb)} trades (all models) -> {allp}")
 
     if args.stress:
-        _stress_grid(spy, aux, names)
+        _stress_grid(spy, aux, names, args.gross_cap, args.entry_fill)
 
 
 if __name__ == "__main__":

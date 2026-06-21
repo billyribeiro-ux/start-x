@@ -159,3 +159,15 @@ Four specialist agents independently stress-tested the book. They converge hard:
   (validate each OOS).
 - Test complementary strategies (momentum/breakout) with the same rigor.
 - Expand beyond SPY/SPX to the catalyst-driven movers, where edges are richer.
+
+## Execution & leverage drill (3 parallel agents, 2019-26)
+- **The book survives realistic (next-open) execution at the portfolio level** (Sharpe/PF/maxDD
+  ~unchanged, OOS too) — it is **trend-capture, not entry precision**. But every sleeve buys a
+  +3-8 bp overnight gap-up, so on a per-trade drift-adjusted basis the entry signals have NO
+  standalone edge off the close print (IBS −0.16%, t=−2.01; breakout mildly negative). Do not try to
+  scale entry frequency or shorten holds.
+- **Un-levered, the book makes ~half SPY's CAGR with a quarter of the drawdown** (1.0×: 8.8% CAGR /
+  −9.1% maxDD / Sharpe 1.18 / Calmar 0.96 vs SPY 15.8% / −34.1% / 0.85 / 0.46). The edge is **risk
+  reduction, not raw return**; SPY's nominal lead is pure bull beta the book declines to take.
+  Leverage is Sharpe-neutral and just amplifies — **1.5× is the Calmar sweet spot, 3× unjustified.**
+- **R-multiple:** expectancy +1.1 to +1.3 R/trade (lose ~1R, win ~3.4R, ~50% win).
