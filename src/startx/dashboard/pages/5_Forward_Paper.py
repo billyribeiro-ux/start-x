@@ -127,6 +127,11 @@ st.sidebar.info(
 # -- main ------------------------------------------------------------------
 st.title("Forward / Paper-Trading Blotter")
 
+st.warning(
+    "Research / illustrative only — NOT the validated production system. This page trades the "
+    "ABANDONED `prob_up` directional model (out-of-sample AUC ~0.50) with no meta-label gate; "
+    "the validated system is the three-book swing engine in `scripts/run_book.py`.")
+
 if not symbols:
     st.warning("Pick at least one symbol in the sidebar.")
     st.stop()

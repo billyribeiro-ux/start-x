@@ -109,7 +109,9 @@ def _write_ledger(led: pd.DataFrame, path: str) -> int:
     cols = [c for c in _LEDGER_COLS if c in led.columns]
     body = led[cols].copy()
     pps = body["pnl_per_share"] if "pnl_per_share" in body else pd.Series(dtype=float)
-    win = float(pps[led["outcome"].values == "WIN"].sum()) if len(pps) else 0.0
+    # A +1-ATR / breakeven exit is a WIN or SCRATCH, never a LOSS — so scratch is a NON-loser
+    # and belongs on the WIN side. NET TOTAL $ must reflect EVERY trade (== WIN$ + LOSS$).
+    win = float(pps[pd.Series(led["outcome"].values).isin(["WIN", "SCRATCH"]).values].sum()) if len(pps) else 0.0
     loss = float(pps[led["outcome"].values == "LOSS"].sum()) if len(pps) else 0.0
     totals = pd.DataFrame([
         {"sleeve": "TOTAL WIN $", "pnl_per_share": round(win, 2)},

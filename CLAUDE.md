@@ -28,9 +28,19 @@ rule everywhere; only the **max-hold clock = the horizon** differs. Get ONE righ
 - Secrets (FMP key) live only in gitignored `.env`. Never commit secrets or generated CSVs.
 
 ## Settled findings (see FINDINGS.md for evidence)
-- `prob_up` ML directional model is a coin flip OOS (AUC ~0.50). Abandoned.
-- RSI-2 dip-buy in an uptrend (Connors) is a validated OOS edge. Module: `strategy/mean_reversion.py`.
+- `prob_up` ML directional model is a coin flip OOS (AUC ~0.50). **Abandoned for production** — but
+  still wired into the `forward/paper.py` research/forward harness (flagged there as research-only,
+  NOT the validated system; the validated system is the three books in `scripts/run_book.py`).
+- **IBS<0.1 dip-buy in an uptrend is the validated OOS mean-reversion edge** (System #1, short_swing).
+  The legacy **RSI-2 (Connors) entry is DEPRECATED / superseded** — it decayed OOS (drift-adjusted
+  alpha −0.22%, it was just riding the bull). Module: `strategy/mean_reversion.py` (IBS is the default;
+  RSI-2 retained only as `signal="rsi2"`).
 - **VIX "high = short the index" is FALSE on the swing horizon** — forward S&P rises with VIX; the
   −0.75 relationship is same-day/coincident, not predictive. VIX neutral price ≈ 18.
-- **Persistent VIX vol-breakout (≥3 closes above the 2.5σ band, VIX>neutral) = a capitulation
-  LONG.** Market gaps up ~+0.28% next day (~10x baseline). Module: `strategy/vix_capitulation.py`.
+- **High VIX = capitulation LONG, not a short** (≥3 *consecutive* closes above the 2.5σ band,
+  VIX>neutral → next-day gap-up). But be precise about status: the standalone
+  `strategy/vix_capitulation.py` trigger is a **thin, high-conviction research edge** (deep-history
+  7 trades, 71% win, PF 6 after the 2026-06 off-by-one fix) — REAL but small-sample, **not bankable
+  alone and NOT wired into any production book**. The PRODUCTION `fear` sleeve (System #2 long_swing)
+  uses the **better-sampled VVIX trigger** (`volatility_premium.fear_signals`); the spot-VIX
+  capitulation trigger deflated to noise (DSR 0.10) and was replaced by VVIX.

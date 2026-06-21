@@ -1,5 +1,18 @@
 """Forward / paper-testing engine: train on the past, paper-trade forward (strict no-lookahead).
 
+================================ HONESTY BANNER ================================
+This harness scores the **ABANDONED ``prob_up`` directional model** (out-of-sample
+AUC ~0.50 — a coin flip, per CLAUDE.md "Settled findings" and FINDINGS.md). It trades
+that model directionally (``prob_up >= long_th`` -> LONG, ``prob_up <= short_th`` ->
+SHORT, including SHORTS) and applies **NO meta-label gate** — the surviving validated
+take/skip gate (``startx.learning.walk_forward_metalabel``) is bypassed here.
+
+It is therefore **RESEARCH / ILLUSTRATIVE ONLY — NOT the validated production system.**
+The validated production system is the three-book swing engine in
+``scripts/run_book.py`` (breakout / IBS / fear, LONG-ONLY). Do not read any P&L,
+hit-rate, or Sharpe produced by this harness as a real edge.
+===============================================================================
+
 The contract, bar by bar
 ------------------------
 1. **Train once, on the past only.** :func:`forward_test` calls
@@ -25,10 +38,18 @@ API. No global state, no network beyond the injected FMP ``client``.
 """
 from __future__ import annotations
 
+import warnings
 from dataclasses import asdict, dataclass
 
 import numpy as np
 import pandas as pd
+
+#: One-sentence honesty warning emitted once per process when the harness runs.
+_ABANDONED_MODEL_WARNING = (
+    "startx.forward.paper trades the ABANDONED prob_up directional model (OOS AUC ~0.50) "
+    "with NO meta-label gate — it is research/illustrative only, NOT the validated production "
+    "system (the three books in scripts/run_book.py). Do not treat its output as a real edge."
+)
 
 from ..backtest.costs import CostModel
 from ..data.cache import ParquetCache
@@ -364,6 +385,10 @@ def forward_test(
     * ``summary`` — dict: ``n_trades, n_open, hit_rate, total_pnl_cash, total_return, sharpe,
       max_drawdown, profit_factor, avg_bars_held``.
     """
+    # Honesty: a programmatic caller must not mistake this for validated output. Behaviour is
+    # otherwise unchanged. ``warnings`` dedupes by (message, category, module) so this fires once.
+    warnings.warn(_ABANDONED_MODEL_WARNING, RuntimeWarning, stacklevel=2)
+
     settings = settings or get_settings()
     cache = cache or ParquetCache(settings.cache_dir)
     universe = universe or load_universe()
@@ -457,6 +482,9 @@ def live_signals(
     with ``[symbol, date, prob_up, side]`` (one row per ticker that has data on/just before
     ``asof``) and ``side in {'long','short','flat'}``.
     """
+    # Same honesty warning as forward_test: this scores the ABANDONED prob_up model, no meta gate.
+    warnings.warn(_ABANDONED_MODEL_WARNING, RuntimeWarning, stacklevel=2)
+
     settings = settings or get_settings()
     cache = cache or ParquetCache(settings.cache_dir)
     universe = universe or load_universe()

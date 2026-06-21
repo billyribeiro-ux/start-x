@@ -1,14 +1,19 @@
-"""Preset triple-barrier horizons for SHORT- and LONG-swing labeling."""
+"""Preset triple-barrier horizons, one per book horizon (see CLAUDE.md / STRATEGY.md)."""
 from __future__ import annotations
 
 import pandas as pd
 
 from .triple_barrier import triple_barrier_labels
 
-#: Named barrier presets. ``short`` is a tight ~2-week swing; ``long`` a ~3-month swing.
+#: Named barrier presets, aligned to the three production books:
+#:   ``short``    — 1-10 day swing (short_swing book; 10-day hard cap).
+#:   ``long``     — weeks to ~3 months (long_swing book; 63-day cap).
+#:   ``position`` — long hold, months-to-years (position book; 504-day backstop). The labeling
+#:                  vertical barrier is a practical ~1yr (252d); the book itself rides to 504.
 HORIZONS: dict[str, dict[str, float | int]] = {
     "short": {"horizon_days": 10, "pt_mult": 1.5, "sl_mult": 1.5, "vol_span": 21},
-    "long": {"horizon_days": 60, "pt_mult": 2.5, "sl_mult": 2.5, "vol_span": 63},
+    "long": {"horizon_days": 63, "pt_mult": 2.5, "sl_mult": 2.5, "vol_span": 63},
+    "position": {"horizon_days": 252, "pt_mult": 3.0, "sl_mult": 3.0, "vol_span": 63},
 }
 
 

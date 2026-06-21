@@ -1,6 +1,14 @@
-"""VIX-capitulation swing signal — a *separate* edge from the RSI-2 dip-buy.
+"""VIX-capitulation swing signal — a *separate*, RESEARCH-ONLY edge (not in any production book).
 
-The thesis, validated on 16y of data (2010-2026): when VIX makes several *consecutive*
+STATUS (be precise — this module's claims were over-stated and are now reconciled):
+  • It is a THIN, high-conviction RESEARCH edge: on the deep ^GSPC 1990-2026 sample the corrected
+    trigger (``min_closes=3``, after the 2026-06 off-by-one fix to the run-length counter) is 7
+    trades, 71% win, PF ~6 — REAL but small-sample, NOT bankable alone.
+  • It is NOT wired into any production book. The PRODUCTION ``fear`` sleeve (System #2 long_swing)
+    uses the better-sampled VVIX trigger in ``volatility_premium.fear_signals``; the spot-VIX
+    capitulation trigger here deflated to noise (DSR 0.10) and was replaced by VVIX for the book.
+
+The thesis (tested on 2010-2026, corrected 2026-06): when VIX makes several *consecutive*
 closes above its upper volatility band (20-day Bollinger at 2.5 sigma) while already above its
 neutral price (~18, the zero-drift mean-reversion level), the market is in persistent, exhausted
 fear — i.e. **capitulation**. Capitulation marks bottoms, not the start of falls: the down-move is

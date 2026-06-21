@@ -7,6 +7,34 @@ Evidence lives in `FINDINGS.md`; the locked study window is **Jan 2019 → Jun 2
 
 ## 2026-06-21
 
+### Audit confirmation round — end-to-end verification + the genuinely-open fixes
+A second meta-audit was confirmed claim-by-claim against the CURRENT tree. Its corrections to the
+first pass were re-verified TRUE: production does NOT violate the locked rules — `run_book.py` BOOKS
+passes per-book `exits` (10/63/504; the 252 is only an engine fallback), `engine._ledger_row` does
+WIN/SCRATCH/LOSS, `2010` is warm-up data and the engine clips trades to the 2019 window, `vol_target`
+is tested, and `normalize_ledger` charges cost once. Binary WIN/LOSS lives only in research-helper
+`backtest()` functions, not the production ledger. The genuinely-open items were fixed:
+- **Doc contradictions reconciled (CLAUDE.md + module docstring).** RSI-2 is now stated as
+  DEPRECATED/superseded by IBS<0.1 (was "a validated OOS edge", contradicting the code's DEPRECATED
+  and FINDINGS/ROADMAP). The VIX-capitulation entry is now precise: a THIN (deep-history 7-trade)
+  research edge, REAL but not bankable alone and **NOT in any production book** — the production
+  `fear` sleeve uses the VVIX trigger (`volatility_premium.fear_signals`); the spot-VIX trigger
+  deflated to noise (DSR 0.10) and was replaced. `vix_capitulation.py`'s "validated on 16y" header
+  reconciled to the same status.
+- **prob_up forward harness flagged honestly.** `forward/paper.py` still scores the ABANDONED
+  `prob_up` directional model (OOS AUC ~0.50; trades both sides incl. SHORTS; no meta-label gate).
+  Added a module-docstring banner + one-time RuntimeWarning (in `forward_test` and `live_signals`)
+  and an `st.warning` on dashboard page `5_Forward_Paper.py`, marking it research-only — NOT the
+  validated three-book system. Proper fix (repoint the harness to forward-test `run_book`'s three
+  books, long-only) logged as a recommendation; `tests/test_forward.py` still green.
+- **Labeling presets aligned to the three books (`labeling/config.py`).** `long` horizon 60→**63**
+  (matches the long_swing cap), and a new `position` preset (252d) added — the 60-vs-63 drift removed.
+- **Locked CSV totals made rule-consistent + tested.** `_write_ledger` had SCRATCH in neither
+  TOTAL WIN $ nor TOTAL LOSS $, so NET omitted scratch P&L. Per the locked "+1-ATR/breakeven =
+  WIN/SCRATCH" rule, scratch now sums on the WIN side and **NET TOTAL $ = every trade**. New
+  `tests/test_run_book_ledger.py` locks the layout + totals math (incl. a scratch row). (Live SPY
+  runs emit zero scratch today, so today's NET is numerically unchanged — but now correct by construction.)
+
 ### Fixed (correctness — the off-by-one the audit's new tests surfaced)
 - **`vix_capitulation.capitulation_signals` fired one close early.** The run-length counter grouped by
   `(~above).cumsum()`, which folds the breaking False bar into the following run, so the FIRST
