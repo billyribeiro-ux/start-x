@@ -51,22 +51,21 @@ def _max_drawdown(r: pd.Series) -> float:
 
 
 def _deflated_sharpe(r: pd.Series, ppy: int, n_trials: int = 8) -> float:
-    """Probability the annualized Sharpe is > 0 after deflating for ``n_trials`` (Bailey/LdP)."""
+    """Probability the true (per-period) Sharpe is > 0 after deflating for ``n_trials``.
+
+    Thin wrapper that delegates to the audited, textbook Bailey/López-de-Prado
+    implementation in :func:`startx.validation.metrics.deflated_sharpe`. The DSR
+    is a *probability* and is invariant to annualization (the sqrt-ppy scaling
+    cancels in the standardisation), so ``ppy`` is accepted for signature
+    symmetry with the other helpers but is not used by the formula.
+    """
+    if len(r) < 12 or r.std() == 0:
+        return float("nan")
     try:
-        from scipy.stats import norm, skew, kurtosis
+        from startx.validation.metrics import deflated_sharpe as _dsr
     except Exception:
         return float("nan")
-    n = len(r)
-    if n < 12 or r.std() == 0:
-        return float("nan")
-    sr = r.mean() / r.std()                      # per-period Sharpe
-    sk, ku = float(skew(r)), float(kurtosis(r, fisher=False))
-    sr_star = np.sqrt((1 - np.euler_gamma) * norm.ppf(1 - 1 / n)
-                      + np.euler_gamma * norm.ppf(1 - 1 / (n * np.e))) / np.sqrt(ppy)
-    sr_star *= np.sqrt(max(n_trials, 1))
-    denom = np.sqrt(max(1e-9, 1 - sk * sr + (ku - 1) / 4 * sr ** 2))
-    z = (sr - sr_star / np.sqrt(ppy)) * np.sqrt(n - 1) / denom
-    return float(norm.cdf(z))
+    return float(_dsr(r, n_trials=n_trials))
 
 
 def combine(streams: dict[str, pd.Series], *, method: str = "max_sharpe", long_only: bool = True,
@@ -83,7 +82,12 @@ def combine(streams: dict[str, pd.Series], *, method: str = "max_sharpe", long_o
     mu, cov = M.mean().values, M.cov().values
 
     if method == "max_sharpe":
-        w = np.linalg.solve(cov + np.eye(len(mu)) * 1e-10, mu)
+        # Scale-aware ridge: stabilises the tangency solve when edges are
+        # near-collinear (a 1e-10 ridge let weights blow up to e.g. {+249,-248}
+        # under long_only=False). Ties the regularisation to the covariance
+        # scale (mean diagonal variance) so it works for any return units.
+        ridge = 1e-6 * np.trace(cov) / len(cov)
+        w = np.linalg.solve(cov + np.eye(len(mu)) * ridge, mu)
     elif method == "risk_parity":
         w = 1.0 / M.std().values
     else:

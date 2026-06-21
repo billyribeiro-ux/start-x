@@ -48,7 +48,10 @@ ensemble** — world-class *because* it's a portfolio of real edges, not a fragi
 | ML ranker (market-neutral) | 0.90 | 26% | 0.09 |
 | Reaction-PEAD | 0.44 | 2% | 0.23 |
 
-**Ensemble: Sharpe 1.38 · deflated Sharpe 0.61 · CAGR +12.9% · maxDD −8.7% · Calmar 1.49** (89 months).
+**Ensemble: Sharpe 1.38 · deflated Sharpe 0.995 · CAGR +12.9% · maxDD −8.7% · Calmar 1.49** (89 months).
+[DSR corrected 2026-06-21: the prior "0.61" came from a since-fixed *pessimistic* bug in
+`ensemble._deflated_sharpe` (double `/√ppy`); the audited Bailey/LdP formula gives **0.995** on the
+same 89-month stream — the ensemble clears the 0.95 "REAL" bar.]
 vs SPY buy-and-hold (0.85 / +15.8% / −34.1% / 0.46): ~the index's return at a quarter of the
 drawdown, 62% higher Sharpe, near-zero correlation. The ML ranker lifts the book +0.25 Sharpe at
 corr 0.09 — real diversification. The thin orthogonal edges (index-flow, macro-PPI, stat-arb) and the

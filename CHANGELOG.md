@@ -29,9 +29,19 @@ attribution engine, and (c) the abandoned `prob_up` ML pipeline — none touch t
 - **`vix_capitulation.backtest` outcome now WIN/SCRATCH/LOSS** (was binary — the one sleeve helper
   missed in the earlier harmonization), matching `engine._ledger_row` and the locked rule.
 
+### Fixed (forensic re-audit — ensemble)
+- **`ensemble._deflated_sharpe` replaced by the audited Bailey/LdP formula.** The local version was
+  mangled four ways (incl. dividing `sr_star` by `√ppy` twice) — a *pessimistic* bug that UNDERSTATED
+  the DSR. It now delegates to `validation.metrics.deflated_sharpe`. Recomputed on the 89-month
+  decoded ensemble: **DSR 0.61 → 0.995** (the prior 0.61 in DECODE.md is corrected; the ensemble
+  actually clears the 0.95 "REAL" bar). Off the production money path, but it's the number DECODE.md
+  reported. `tests/test_ensemble.py` added (7).
+- **Ensemble max-Sharpe ridge made scale-aware** (`1e-10` → `1e-6·trace(cov)/n`) so the tangency
+  solve doesn't explode on near-collinear edges under `long_only=False` (default long-only unchanged).
+
 _Remaining forensic fixes — cache-coverage wiring (HIGH), attribution intraday-leakage gate (HIGH),
-ensemble deflated-Sharpe formula, and validation purge/PurgedKFold/allow-list hardening — are landing
-via a parallel fix fleet and will be committed as each is verified._
+and validation purge/PurgedKFold/allow-list hardening — are landing via the fix fleet and committed
+as each is verified._
 
 ### Fixed (the three flagged known-limitations — "get everything fixed")
 - **`days_to_next_earnings` PIT leak closed.** `features/flow.py` counted days to the next future
