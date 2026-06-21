@@ -12,6 +12,11 @@ Evidence lives in `FINDINGS.md`; the locked study window is **Jan 2019 → Jun 2
   so the breadth guard is judged head-to-head, not by assertion: **base** = IBS dip ungated;
   **guarded** = IBS dip breadth-guarded. `--out` writes one CSV per model; a head-to-head table
   prints win/PF/maxDD/Sharpe for both. (Per user: race both, log every change.)
+- **Stress grid** (`--stress`): both models across 2019-22 (incl. bear) / 2023-26 (bull) / full, so
+  regime-dependence is visible at a glance. Result: **guarded wins the 2019-22 bear outright** (win
+  50→53%, PF 2.74→3.16, maxDD −17.7→−14.8%) — the guard is a stress protector; base edges raw return
+  in the calm bull. **Combined all-trades export** (`<out>_all.csv`): every trade from every model,
+  tagged by `model`.
 - **Market-internals layer** (`strategy/market_internals.py`). Derives 5 breadth internals from the
   503 S&P-500 constituents (no vendor breadth feed on the FMP plan): % above 50/200d MA,
   advance/decline, up/down volume, new highs−lows, McClellan. Point-in-time (trailing quantiles,

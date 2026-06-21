@@ -64,7 +64,12 @@ MODELS = {
 }
 
 
-def _run_one(name, sleeves, spy, aux, start, end, n_trials, out):
+_LEDGER_COLS = ["model", "sleeve", "entry_date", "entry_price", "stop_price", "exit_date",
+                "exit_price", "exit_reason", "bars_held", "weight", "ret", "pnl_contrib",
+                "regime", "conviction", "thesis", "outcome"]
+
+
+def _run_one(name, sleeves, spy, aux, start, end, out):
     res = run_portfolio(spy, aux, sleeves, start=start, end=end)
     s = res.stats
     print(f"\n=== MODEL: {name} ===")
@@ -72,16 +77,27 @@ def _run_one(name, sleeves, spy, aux, start, end, n_trials, out):
           f"maxDD={s['max_drawdown']*100:.1f}% PF={s['profit_factor']:.2f} "
           f"Sharpe={s.get('ann_sharpe', float('nan')):.2f} exposure={s.get('exposure', 0)*100:.0f}%")
     led = annotate_theses(res.ledger, spy, aux)
+    led.insert(0, "model", name)
     print("  BOOK NOW:", summarize_book(led))
     if out:
-        path = out if len(MODELS) == 1 else out.replace(".csv", f"_{name}.csv")
-        cols = [c for c in ["sleeve", "entry_date", "entry_price", "stop_price", "exit_date",
-                            "exit_price", "exit_reason", "bars_held", "weight", "ret",
-                            "pnl_contrib", "regime", "conviction", "thesis", "outcome"]
-                if c in led.columns]
-        led[cols].to_csv(path, index=False)
+        path = out.replace(".csv", f"_{name}.csv")
+        led[[c for c in _LEDGER_COLS if c in led.columns]].to_csv(path, index=False)
         print(f"  wrote {len(led)} trades -> {path}")
-    return s
+    return s, led
+
+
+def _stress_grid(spy, aux, names):
+    """Both models across regimes, so their regime-dependence is visible at a glance."""
+    windows = [("2019-22 (incl. bear)", "2019-01-01", "2022-12-31"),
+               ("2023-26 (bull)", "2023-01-01", "2026-06-19"),
+               ("FULL 2019-26", "2019-01-01", "2026-06-19")]
+    print("\n=== STRESS GRID (models × regimes) ===")
+    print(f"  {'window':22}{'model':9}{'n':>4}{'win':>6}{'total':>9}{'PF':>7}{'maxDD':>8}{'Sharpe':>8}")
+    for wl, st, en in windows:
+        for m in names:
+            s = run_portfolio(spy, aux, MODELS[m], start=st, end=en).stats
+            print(f"  {wl:22}{m:9}{s['n']:4}{s['win_rate']*100:5.0f}%{s['total_return']*100:+8.1f}%"
+                  f"{s['profit_factor']:7.2f}{s['max_drawdown']*100:7.1f}%{s.get('ann_sharpe', 0):8.2f}")
 
 
 def main() -> None:
@@ -91,6 +107,7 @@ def main() -> None:
     ap.add_argument("--n-trials", type=int, default=10, dest="n_trials")
     ap.add_argument("--model", default="both", choices=["base", "guarded", "both"])
     ap.add_argument("--out", default=None, help="write the annotated ledger(s) to this CSV")
+    ap.add_argument("--stress", action="store_true", help="print the models × regimes stress grid")
     args = ap.parse_args()
 
     spy = _load("SPY"); spy.attrs["symbol"] = "SPY"
@@ -99,17 +116,28 @@ def main() -> None:
 
     names = ["base", "guarded"] if args.model == "both" else [args.model]
     print(f"PRODUCTION BOOK  {args.start} -> {args.end}  (models: {', '.join(names)})")
-    stats = {n: _run_one(n, MODELS[n], spy, aux, args.start, args.end, args.n_trials, args.out)
-             for n in names}
+    stats, ledgers = {}, []
+    for n in names:
+        s, led = _run_one(n, MODELS[n], spy, aux, args.start, args.end, args.out)
+        stats[n] = s; ledgers.append(led)
 
     if len(names) == 2:
         print("\n=== HEAD-TO-HEAD ===")
-        hdr = f"  {'metric':12}" + "".join(f"{n:>12}" for n in names)
-        print(hdr)
+        print(f"  {'metric':12}" + "".join(f"{n:>12}" for n in names))
         for k, fmt in [("n", "{:d}"), ("win_rate", "{:.0%}"), ("total_return", "{:+.1%}"),
                        ("profit_factor", "{:.2f}"), ("max_drawdown", "{:.1%}"), ("ann_sharpe", "{:.2f}")]:
             row = "".join(f"{fmt.format(stats[n].get(k, 0)):>12}" for n in names)
             print(f"  {k:12}{row}")
+
+    # combined "all trades" export (every trade from every model, tagged by `model`)
+    if args.out and len(ledgers) > 1:
+        allp = args.out.replace(".csv", "_all.csv")
+        comb = pd.concat(ledgers, ignore_index=True)
+        comb[[c for c in _LEDGER_COLS if c in comb.columns]].to_csv(allp, index=False)
+        print(f"\nwrote {len(comb)} trades (all models) -> {allp}")
+
+    if args.stress:
+        _stress_grid(spy, aux, names)
 
 
 if __name__ == "__main__":
