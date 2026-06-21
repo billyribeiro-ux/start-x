@@ -24,6 +24,7 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
+import numpy as np
 import pandas as pd
 
 from startx.portfolio import run_portfolio
@@ -32,6 +33,7 @@ from startx.strategy.mean_reversion import ibs_signals
 from startx.strategy.momentum_breakout import breakout_signals
 from startx.strategy.volatility_premium import fear_signals
 from startx.strategy.market_internals import load_internals, not_breaking_down
+from startx.strategy.trend_position import position_book
 
 
 def _load(sym: str) -> pd.DataFrame:
@@ -80,10 +82,13 @@ BOOKS: dict[str, dict] = {
         "exits": {"breakout": (1.0, 3.0, 63), "fear": (1.0, 3.0, 63)},  # weeks → ~3 months
     },
     "position": {
-        "desc": "POSITION / PORTFOLIO — long hold (months to years). 200-SMA trend core; "
-                "1-ATR stop, 3-ATR chandelier, multi-year (504-day) backstop.",
-        "models": {"base": {"breakout": _breakout}},  # not breadth-gated → single model
-        "exits": {"breakout": (1.0, 3.0, 504)},  # ride a long position to exhaustion
+        # System #3 has its OWN engine (strategy/trend_position.py) — a continuous 200-SMA ±band
+        # regime allocation, NOT the discrete chandelier sleeve path. models/exits are unused here.
+        "desc": "POSITION / PORTFOLIO — long hold (months to years). 200-SMA ±3% band trend core "
+                "(long above / flat below); the trend breakdown IS the stop — no ATR stop. "
+                "Drawdown defense vs SPY buy-and-hold, NOT a B&H-beater.",
+        "models": {"base": {}},
+        "exits": {},
     },
 }
 
@@ -184,6 +189,58 @@ def _stress_grid(spy, aux, names, models, exits, gross_cap, entry_fill):
                   f"{s['profit_factor']:7.2f}{s['max_drawdown']*100:7.1f}%{s.get('ann_sharpe', 0):8.2f}")
 
 
+_POS_ENTRY_RULE = ("ENTRY: SPY closes above its {sma}-day SMA × (1+{band:.0%}) from flat — the trend "
+                   "regime turns up. Long-only, one continuous position.")
+_POS_EXIT_RULE = ("EXIT: SPY closes below its {sma}-day SMA × (1−{band:.0%}) — trend breakdown. NO ATR "
+                  "stop (a tight stop is incompatible with a months-to-years hold); held to the band cross.")
+
+
+def _enrich_position(led: pd.DataFrame, sma_len: int, band: float) -> pd.DataFrame:
+    """Fill the LOCKED ledger columns for a position trade (no ATR stop → those columns are N/A)."""
+    if led.empty:
+        return led
+    led = led.copy()
+    led.insert(0, "model", "position")
+    led["pnl_per_share"] = ((led["exit_price"] - led["entry_price"])
+                            - led["entry_price"] * 0.0002).round(2)
+    led["pnl_contrib"] = led["ret"].round(4)
+    for c in ("stop_price", "stop_pct", "risk_pct", "R", "conviction"):
+        led[c] = np.nan
+    led["entry_rule"] = _POS_ENTRY_RULE.format(sma=sma_len, band=band)
+    led["exit_rule"] = _POS_EXIT_RULE.format(sma=sma_len, band=band)
+    led["regime"] = "trend-long"
+    led["thesis"] = ""
+    return led
+
+
+def _run_position(spy, start, end, out, sma_len, band) -> None:
+    """Run System #3 (200-SMA ±band position core) and print the head-to-head vs SPY buy-and-hold."""
+    res = position_book(spy, sma_len=sma_len, band=band, start=start, end=end)
+    s, bnh = res.stats, res.benchmark
+    led = _enrich_position(res.ledger, sma_len, band)
+    n = len(led)
+    wins = int((led["outcome"] == "WIN").sum()) if n else 0
+    print(f"\n=== POSITION CORE ({sma_len}-SMA ±{band:.0%} band, un-levered) vs SPY BUY & HOLD ===")
+    print(f"  {'metric':12}{'position':>12}{'buy&hold':>12}")
+    for k, lbl, fmt in [("cagr", "CAGR", "{:+.1%}"), ("total_return", "total", "{:+.1%}"),
+                        ("ann_sharpe", "Sharpe", "{:.2f}"), ("max_drawdown", "maxDD", "{:.1%}"),
+                        ("calmar", "Calmar", "{:.2f}"), ("vol_ann", "vol", "{:.1%}"),
+                        ("exposure", "exposure", "{:.0%}")]:
+        print(f"  {lbl:12}{fmt.format(s.get(k, float('nan'))):>12}{fmt.format(bnh.get(k, float('nan'))):>12}")
+    print(f"  {'trades':12}{n:>12}{'—':>12}")
+    if n:
+        print(f"  {'win-rate':12}{wins / n:>11.0%}{'—':>12}")
+    if bnh.get("cagr") and bnh.get("max_drawdown"):
+        keep = s["cagr"] / bnh["cagr"] * 100
+        ddr = abs(s["max_drawdown"] / bnh["max_drawdown"]) * 100
+        print(f"  → keeps {keep:.0f}% of B&H CAGR at {ddr:.0f}% of its drawdown — this book is "
+              f"DRAWDOWN DEFENSE, not a B&H-beater (it lags in bull-only windows by design).")
+    if out:
+        path = out.replace(".csv", "_position.csv")
+        nr = _write_ledger(led, path)
+        print(f"  wrote {nr} trades (+ TOTAL WIN $/LOSS $/NET $ block) -> {path}")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--book", default="short_swing", choices=list(BOOKS),
@@ -197,12 +254,24 @@ def main() -> None:
                     help="max concurrent gross leverage (leverage drill: 1.5x sweet spot, 1.0x un-levered)")
     ap.add_argument("--entry-fill", default="close", choices=["close", "next_open"], dest="entry_fill",
                     help="fill entries at the signal-day close (default) or the next bar's open")
+    ap.add_argument("--band", type=float, default=0.03,
+                    help="position book only: 200-SMA hysteresis band (default 3%%)")
+    ap.add_argument("--sma-len", type=int, default=200, dest="sma_len",
+                    help="position book only: trend SMA length (default 200)")
     args = ap.parse_args()
+
+    spy = _load("SPY"); spy.attrs["symbol"] = "SPY"
+
+    # System #3 is a continuous trend-regime allocation, NOT the discrete chandelier engine —
+    # it has its own runner and benchmarks head-to-head vs SPY buy-and-hold.
+    if args.book == "position":
+        print(f"BOOK: position  —  {BOOKS['position']['desc']}")
+        print(f"WINDOW {args.start} -> {args.end}")
+        _run_position(spy, args.start, args.end, args.out, args.sma_len, args.band)
+        return
 
     book = BOOKS[args.book]
     models, exits = book["models"], book["exits"]
-
-    spy = _load("SPY"); spy.attrs["symbol"] = "SPY"
     aux = {"vix": _load("_VIX"), "vvix": _load("_VVIX"), "gld": _load("GLD"),
            "internals": load_internals()}
 

@@ -14,8 +14,11 @@ rule everywhere; only the **max-hold clock = the horizon** differs. Get ONE righ
 1. **Short-term swing** — 1–10 trading days (IBS<0.1 dip-buy). HARD 10-day cap. ← System #1, locked.
 2. **Long-term swing** — weeks to ~3 months (breakout + fear capitulation). 63-day cap. ← System #2,
    locked & OOS-validated (4-agent drill: real but FRAGILE — deflated Sharpe 0.81–0.86, large-cap only).
-3. **Position / portfolio** — a long hold, months-to-years (200-SMA trend core). Multi-year backstop.
-   ← System #3, scaffolded, NOT yet calibrated (next).
+3. **Position / portfolio** — a long hold, months-to-years (200-SMA ±3% band trend core; its OWN
+   engine `strategy/trend_position.py`, NOT the chandelier — the trend breakdown IS the stop). ←
+   System #3, BUILT & benchmarked vs SPY buy-and-hold: **drawdown defense, not a B&H-beater**
+   (deep-cycle 1990-2026 ≈ the index's return at 38% of its drawdown, Calmar 0.39 vs 0.15; lags in
+   bull-only windows by design). Leverage & re-entry rails proven not to help (4-agent drill).
 `scripts/run_book.py --book {short_swing,long_swing,position}`.
 
 ## Hard rules the user has set

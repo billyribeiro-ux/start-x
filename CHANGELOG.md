@@ -7,6 +7,24 @@ Evidence lives in `FINDINGS.md`; the locked study window is **Jan 2019 → Jun 2
 
 ## 2026-06-21
 
+### Built — System #3: position book (`strategy/trend_position.py`)
+- **The third book is live: a 200-SMA ±3% hysteresis-band trend core**, long-above / flat-below, its
+  OWN engine (a continuous regime allocation, NOT the discrete chandelier path). The "stop" is the
+  trend breakdown (the SMA band) — there is deliberately no 1-ATR stop or chandelier, which would
+  knock a months-to-years hold out within days. Point-in-time (state decided on the prior close).
+  `scripts/run_book.py --book position` prints the head-to-head vs SPY buy-and-hold and writes the
+  locked-layout ledger (`--band`/`--sma-len` to tune).
+- **Honest mandate — drawdown defense, NOT a B&H-beater** (the 4-agent calibration drill: plain
+  timing has no Sharpe edge over B&H, leverage is no free lunch, re-entry rails don't robustly help):
+  - **Deep cycle ^GSPC 1990-2026:** +8.6% CAGR / −21.7% maxDD / Calmar 0.39 / Sharpe 0.77 vs B&H
+    +8.7% / −56.8% / 0.15 / 0.55 — **≈ the index's return at 38% of its drawdown** (Calmar 2.6×),
+    cutting all four bears (dot-com, GFC, COVID, 2022) ~in half.
+  - **Locked 2019-26 (bull-only, it lags by design):** +9.2% / −22.1% / Calmar 0.42 vs B&H +15.8% /
+    −34.1% / 0.46 — keeps 58% of B&H CAGR at 65% of its drawdown; value is insurance against the
+    −50%+ tail the window doesn't contain. 6 trades, the winners held 434/530 bars (months-to-years).
+  - Tests: `tests/test_trend_position.py` (PIT stability, band hysteresis, ledger/benchmark, turnover).
+  **All three books now built.** (STRATEGY.md + CLAUDE.md updated.)
+
 ### Forensic re-audit (6 parallel Opus agents) — verdict: no faked edge
 A full-codebase hostile forensic sweep with reproducible probes. **The core is CLEAN:** the production
 money path (engine/run_book) has no lookahead / cap-defeat / cost-double-charge (all recent fixes

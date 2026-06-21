@@ -6,13 +6,12 @@ Ideas captured to revisit. Nothing here is dropped — we fix/build when we get 
 Now that the desk is **three separate books** and **System #1 (short_swing) is locked & OOS-validated**,
 these are the highest-leverage next moves, hardest-evidence first:
 
-1. **Calibrate System #2 — long_swing (weeks→~3 months).** It's currently scaffolded (breakout+fear,
-   63-day cap) but NOT yet validated as its own book. Sweep the max-hold cap (40 / 63 / 90d) and
-   confirm: positive in BOTH train (2019-22) and test (2023-26); the cap doesn't time-chop a still-
-   trending winner (the +$96/sh fear runner needs the ~3-month room); no same-bar churn. Then lock it.
-2. **Calibrate System #3 — position (long hold).** Needs a real entry (200-SMA trend regime / stay-long-
-   above), benchmarked head-to-head vs SPY buy-&-hold. The bar here is explicit: **match the index's
-   return at materially lower drawdown** (our edge has always been Calmar, not raw return).
+1. ~~**Calibrate System #2 — long_swing.**~~ ✅ DONE — locked at 63d, OOS-validated (real but FRAGILE,
+   deflated Sharpe 0.81–0.86), 4-agent drill. See CHANGELOG / STRATEGY.md.
+2. ~~**Calibrate System #3 — position (long hold).**~~ ✅ DONE — 200-SMA ±3% band trend core
+   (`strategy/trend_position.py`), benchmarked vs SPY B&H: deep-cycle 1990-2026 ≈ the index's return
+   at 38% of its drawdown (Calmar 0.39 vs 0.15). Honest verdict: drawdown defense, not a B&H-beater;
+   lags in bull-only windows; leverage/re-entry rails proven not to help. **All three books now built.**
 3. **Walk-forward the PARAMETERS, don't in-sample them.** The 10-day cap, IBS<0.1 threshold, and 1/3-ATR
    mults were picked on the full sample. Re-fit on a rolling train window, apply forward, and report a
    **deflated Sharpe penalized for the number of configs tried** — otherwise the cap/threshold choice is

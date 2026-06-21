@@ -13,19 +13,20 @@ self-documenting.
 
 ## Three separate books — one per horizon (LOCKED architecture)
 
-The desk runs **three distinct systems, never mixed in one book.** Same 1-ATR-stop / 3-ATR-chandelier
-rule everywhere; only the **max-hold clock = the horizon** differs. `scripts/run_book.py --book {…}`.
+The desk runs **three distinct systems, never mixed in one book.** The two **swing** books share the
+1-ATR-stop / 3-ATR-chandelier rule (only the max-hold horizon differs); the **position** book is a
+different animal — a continuous trend-regime allocation whose "stop" is the trend breakdown itself.
+`scripts/run_book.py --book {…}`.
 
-| Book | Horizon | Sleeves | max hold | Status |
+| Book | Horizon | Sleeves | exit | Status |
 |---|---|---|---|---|
-| **short_swing** | 1–10 trading days | `ibs` | 10 d | ✅ #1 locked & OOS-validated |
-| **long_swing** | weeks to ~3 months | `breakout` + `fear` | 63 d | ✅ #2 locked & OOS-validated (rated *real but FRAGILE*) |
-| **position** | months to years | `breakout` (200-SMA core) | 504 d | ⏳ scaffolded, not yet calibrated |
+| **short_swing** | 1–10 trading days | `ibs` | 1-ATR / 3-ATR, 10 d | ✅ #1 locked & OOS-validated |
+| **long_swing** | weeks to ~3 months | `breakout` + `fear` | 1-ATR / 3-ATR, 63 d | ✅ #2 locked & OOS-validated (real but FRAGILE) |
+| **position** | months to years | `position_trend` (200-SMA ±3% band) | 200-SMA band cross (no ATR stop) | ✅ #3 built — **drawdown defense**, not a B&H-beater |
 
 **Models.** Only `short_swing` runs two models (`--model base|guarded|both`): **base** = IBS dip
 ungated, **guarded** = IBS dip also requires healthy breadth (no falling knives). `long_swing` and
-`position` carry no breadth-gated sleeve, so they expose a single `base` model (a "guarded" run would
-be byte-identical).
+`position` carry no breadth-gated sleeve, so they expose a single `base` model.
 
 ---
 
@@ -49,7 +50,10 @@ Mechanically, each open trade tracks two levels off ATR(14) at entry:
 | short_swing → **ibs** | 1 ATR | 3 ATR | **10 d** | short-term dip — quick mean-reversion, never a year |
 | long_swing → **breakout** | 1 ATR | 3 ATR | **63 d** | trend — ride weeks-to-~3-months (cap-swept: 63 is the spec-faithful plateau) |
 | long_swing → **fear** | 1 ATR | 3 ATR | **63 d** | capitulation bounce — ride to exhaustion within the horizon |
-| position → **breakout** | 1 ATR | 3 ATR | **504 d** | long hold — ride a trend for months-to-years |
+
+The **position book is the exception** to this rule (see its own section below): it has NO ATR stop
+and NO chandelier — a 1-ATR stop would knock you out within days and defeat a months-to-years hold.
+Its exit is the **200-SMA band breakdown**; it holds through ordinary pullbacks for months-to-years.
 
 ---
 
@@ -96,6 +100,28 @@ Mechanically, each open trade tracks two levels off ATR(14) at entry:
 plateau is broad (27/27 perturbation cells positive — no knife-edge). **Honest ceiling:** deflated
 Sharpe 0.81–0.86 — clears the 0.70 "fragile" floor but **below the 0.95 "REAL" bar**; top-3 trades are
 ~47% of P&L. Tradeable as a thin large-cap edge, sized accordingly — not a slam-dunk.
+
+## Sleeve — `position_trend` (200-SMA ±3% band; System #3 = position; its own engine)
+
+- **ENTRY:** SPY closes **above its 200-day SMA × (1 + 3%)** from flat — the trend regime turns up.
+  Long-only, ONE continuous position (`strategy/trend_position.py`, not the chandelier engine).
+- **EXIT:** SPY closes **below its 200-day SMA × (1 − 3%)** — the trend breaks down. **No ATR stop,
+  no chandelier**; the position rides through ordinary pullbacks for months-to-years. The ±3%
+  hysteresis band is what stops the daily flip-flopping a bare `close vs SMA` cross produces.
+- **Sizing:** un-levered (1.0× when long, flat otherwise). A 4-agent drill proved leverage is no free
+  lunch (the "halved vol" is a sitting-in-cash artifact; vol-matched leverage still trails B&H on CAGR
+  at ≈ B&H drawdown) and re-entry rails (capitulation / SMA50) don't robustly help.
+- **Why it exists / honest mandate:** **drawdown defense, benchmarked head-to-head vs SPY
+  buy-and-hold — NOT a B&H-beater.** It aims to match the index's return at materially lower drawdown
+  by sitting out the full-cycle bears.
+- **Validated (run `--book position`):**
+  - **Deep cycle ^GSPC 1990-2026 (where it earns its keep):** position +8.6% CAGR / −21.7% maxDD /
+    Calmar 0.39 / Sharpe 0.77 vs B&H +8.7% / −56.8% / 0.15 / 0.55 — **≈ the index's return at 38% of
+    its drawdown** (Calmar 2.6×), cutting all four bears (dot-com, GFC, COVID, 2022) roughly in half.
+  - **Locked 2019-26 (bull-only — it LAGS, by design):** +9.2% CAGR / −22.1% maxDD / Calmar 0.42 vs
+    B&H +15.8% / −34.1% / 0.46 — keeps 58% of B&H CAGR at 65% of its drawdown. The value is insurance
+    against the −50%+ tail the locked window simply doesn't contain; in a fast-recovery bull you'd hold
+    SPY. Tune the band/SMA with `--band` / `--sma-len`.
 
 ---
 
