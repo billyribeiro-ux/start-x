@@ -96,6 +96,19 @@ Static 18 was a trap (leaned on one lucky 2021 trade); p70-252 is the simpler ne
 drift), pre-FOMC drift (didn't persist), Santa/sell-in-May (B&H proxies), day-of-week, rates
 direction, dollar, breadth%, growth-vs-small-cap (all TRAIN→TEST collapses / 2022 artifacts).
 
+## Market internals (breadth derived from the 503 S&P constituents)
+No vendor breadth feed on FMP, so internals are derived from the constituent panel (% above 50/200d,
+A/D, up/down volume, new highs−lows, McClellan), point-in-time. Two honest results:
+- **Breadth *confirmation* for the FEAR sleeve does NOT generalize.** The 2026-03 "wait for the
+  washout climax" story was a cherry-pick (n=13 fear trades; breadth barely separates winners from
+  losers, and the gate slightly *hurt* the book OOS). Not shipped.
+- **Breadth *guard* on the IBS dip sleeve IS real** — and it's a risk filter, not alpha. IBS losers
+  buy oversold dips into a **broad breakdown** (up-volume ≤20% / ≥80% down-volume, A/D collapsing);
+  up/down volume separated IBS win/loss at **AUC 0.78**. Standing aside on those days: win 58→61%,
+  **maxDD −19.4%→−15.5%** (FULL 2019-26), vetoes the 2026-03-18 falling knife; small raw-return
+  give-up on the calm 2023-26 window (its value shows up in stress). Module:
+  `strategy/market_internals.py` (`not_breaking_down`). Internals also feed the human thesis layer.
+
 ## Cross-desk stress test — Quant / ML / Mathematician / Market-Maker (2019-26)
 Four specialist agents independently stress-tested the book. They converge hard:
 - **The system's value is RISK-ADJUSTED, not alpha over the index.** Best portfolio (concurrent,

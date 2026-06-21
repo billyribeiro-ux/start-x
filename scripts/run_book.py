@@ -22,6 +22,7 @@ from startx.portfolio.validate import confidence_scorecard
 from startx.strategy.mean_reversion import ibs_signals
 from startx.strategy.momentum_breakout import breakout_signals
 from startx.strategy.volatility_premium import fear_signals
+from startx.strategy.market_internals import load_internals, not_breaking_down
 
 
 def _load(sym: str) -> pd.DataFrame:
@@ -30,12 +31,19 @@ def _load(sym: str) -> pd.DataFrame:
     return p.sort_values("date").reset_index(drop=True)
 
 
-#: The book: three independent sleeves wrapped to the engine's ``sig(spy, aux)`` contract. The two
-#: vol-premium triggers (VRP, VVIX) are MERGED into one ``fear`` sleeve so a vol spike books a single
-#: position, not two identical ones (fixes the 2026-03-18 same-bar/same-price stacking).
+def _ibs_guarded(s: pd.DataFrame, a: dict) -> pd.Series:
+    """IBS dip entry, guarded by market internals: skip dips bought into a broad down-volume
+    breakdown (the falling-knife losers; cuts book drawdown ~20%)."""
+    sig = ibs_signals(s).reset_index(drop=True)
+    return (sig & not_breaking_down(a["internals"], s)).astype(bool)
+
+
+#: The book: three independent sleeves wrapped to the engine's ``sig(spy, aux)`` contract. VRP and
+#: VVIX are MERGED into one ``fear`` sleeve (no same-bar double-count); the IBS dip sleeve is guarded
+#: by market-internals breadth (no buying dips into a broad-breakdown / heavy-down-volume day).
 SLEEVES = {
     "breakout": lambda s, a: breakout_signals(s, 20, 200),   # the trend edge (only real alpha)
-    "ibs": lambda s, a: ibs_signals(s),                      # oversold-dip exposure timing
+    "ibs": _ibs_guarded,                                     # oversold-dip, breadth-guarded
     "fear": lambda s, a: fear_signals(s, a["vix"], a["vvix"]),  # VRP ∪ VVIX vol-premium long (one position)
 }
 
@@ -49,7 +57,8 @@ def main() -> None:
     args = ap.parse_args()
 
     spy = _load("SPY"); spy.attrs["symbol"] = "SPY"
-    aux = {"vix": _load("_VIX"), "vvix": _load("_VVIX"), "gld": _load("GLD")}
+    aux = {"vix": _load("_VIX"), "vvix": _load("_VVIX"), "gld": _load("GLD"),
+           "internals": load_internals()}
 
     res = run_portfolio(spy, aux, SLEEVES, start=args.start, end=args.end)
     s = res.stats
