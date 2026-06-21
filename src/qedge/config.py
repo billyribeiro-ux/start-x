@@ -21,6 +21,11 @@ class DataConfig(BaseModel):
     # Indicator warm-up history; the analysis window is clipped downstream.
     history_start: str = "2010-01-01"
     cache_dir: str = "data/cache"
+    # Default analysis window pulled from the feed for a scan (inclusive bounds).
+    # Selectable per-run via the CLI --start/--end flags or the scan_symbol/run_scan
+    # start/end arguments; these are just the defaults when the caller does not say.
+    analysis_start: str = "2018-01-01"
+    analysis_end: str = "2026-06-18"
     # Realistic dissemination latency (trading days) applied to lagged feeds so
     # cross-asset / news features never use information before it was public.
     news_latency_days: int = 1

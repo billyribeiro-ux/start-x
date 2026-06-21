@@ -114,15 +114,17 @@ class ScanConfig:
     horizon:
         Which book — ``"short"`` (1-10 day cap) or ``"long"`` (~63-day cap).
     history_start / history_end:
-        Inclusive bounds of the data window pulled from the feed. Defaults to the
-        locked analysis window (2019-01-01 -> 2026-06-30) so a default scan obeys
-        the project memory without the caller restating it.
+        Inclusive bounds of the data window pulled from the feed. Default to the
+        configurable analysis window (``cfg.data.analysis_start`` ->
+        ``cfg.data.analysis_end``, i.e. 2018-01-01 -> 2026-06-18 out of the box).
+        The caller can select any period via the CLI ``--start``/``--end`` flags or
+        the ``scan_symbol``/``run_scan`` ``start``/``end`` arguments.
     """
 
     universe: tuple[str, ...]
     horizon: Horizon = "short"
-    history_start: str = "2019-01-01"
-    history_end: str = "2026-06-30"
+    history_start: str = "2018-01-01"
+    history_end: str = "2026-06-18"
 
     @classmethod
     def from_config(
@@ -131,15 +133,26 @@ class ScanConfig:
         *,
         universe: Sequence[str] | None = None,
         horizon: Horizon = "short",
+        start: str | None = None,
+        end: str | None = None,
     ) -> ScanConfig:
-        """Build a :class:`ScanConfig`, defaulting the universe from ``cfg.data``."""
+        """Build a :class:`ScanConfig`, defaulting universe and window from ``cfg.data``.
+
+        ``start``/``end`` override the configured analysis window when supplied,
+        which is how a caller selects an arbitrary period for a scan.
+        """
         cfg = config if config is not None else get_config()
         resolved = (
             tuple(universe)
             if universe is not None
             else tuple(resolve_universe(cfg).ordered)
         )
-        return cls(universe=resolved, horizon=horizon)
+        return cls(
+            universe=resolved,
+            horizon=horizon,
+            history_start=start if start is not None else cfg.data.analysis_start,
+            history_end=end if end is not None else cfg.data.analysis_end,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -465,6 +478,8 @@ def scan_symbol(
     horizon: Horizon = "short",
     trials: TrialLedger | None = None,
     config: QedgeConfig | None = None,
+    start: str | None = None,
+    end: str | None = None,
 ) -> EdgeResult:
     """Run the full adversarial pipeline for one symbol and return its verdict.
 
@@ -503,7 +518,9 @@ def scan_symbol(
     cfg = config if config is not None else get_config()
     set_seeds(cfg.scanner.seed)
 
-    scan = ScanConfig.from_config(cfg, universe=(symbol,), horizon=horizon)
+    scan = ScanConfig.from_config(
+        cfg, universe=(symbol,), horizon=horizon, start=start, end=end
+    )
     ledger = trials if trials is not None else TrialLedger()
     # Each (symbol, horizon) is one configuration tried — count it for DSR.
     ledger.register(f"{symbol}:{horizon}")
@@ -596,6 +613,8 @@ def run_scan(
     feed: PriceFeed | None = None,
     horizon: Horizon = "short",
     config: QedgeConfig | None = None,
+    start: str | None = None,
+    end: str | None = None,
 ) -> list[EdgeResult]:
     """Scan every symbol in ``universe``, sharing ONE trial ledger across the run.
 
@@ -623,7 +642,9 @@ def run_scan(
         One verdict per symbol, in universe order.
     """
     cfg = config if config is not None else get_config()
-    scan = ScanConfig.from_config(cfg, universe=universe, horizon=horizon)
+    scan = ScanConfig.from_config(
+        cfg, universe=universe, horizon=horizon, start=start, end=end
+    )
     ledger = TrialLedger()
     results: list[EdgeResult] = []
     for symbol in scan.universe:
@@ -634,6 +655,8 @@ def run_scan(
                 horizon=horizon,
                 trials=ledger,
                 config=cfg,
+                start=start,
+                end=end,
             )
         )
     return results

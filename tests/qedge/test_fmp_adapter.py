@@ -121,6 +121,24 @@ def test_price_feed_passes_start_through() -> None:
     assert captured["start"] == "2019-01-01"
 
 
+def test_price_feed_clips_lower_bound_even_when_source_returns_wider() -> None:
+    """The window's lower bound is enforced on the OUTPUT, not just forwarded.
+
+    The reused startx cache keys by symbol only, so a source can return history
+    earlier than the requested ``start`` (a frame cached on an earlier, wider
+    request). The adapter must still clip to ``date >= start`` — this is the
+    regression guard for that bug.
+    """
+    # Source ignores `start` and returns the full 5-bar frame (2021-06-13..17),
+    # mimicking a stale, wider cache hit.
+    feed = FMPPriceFeed(source=lambda symbol, *, start: _fake_price_frame())
+    out = feed.history("SPY", asof=_ASOF, start=pd.Timestamp("2021-06-14"))
+    # Only 2021-06-14 and 2021-06-15 satisfy both start <= date <= asof.
+    assert out["date"].min() == pd.Timestamp("2021-06-14")
+    assert out["date"].max() == _ASOF
+    assert len(out) == 2
+
+
 # -- fundamentals / news feeds PIT logic (offline) ---------------------------
 def test_fundamentals_feed_pit_and_rename() -> None:
     feed = FMPFundamentalsFeed(source=lambda symbol: _fake_ts_frame())

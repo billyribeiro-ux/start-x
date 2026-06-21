@@ -3,7 +3,12 @@
 Usage::
 
     python -m qedge.scanner.cli --universe SPY,QQQ,IWM [--horizon short|long]
+                                [--start YYYY-MM-DD] [--end YYYY-MM-DD]
                                 [--live] [--out DIR]
+
+The analysis window is selectable via ``--start``/``--end``; when omitted it
+defaults to ``cfg.data.analysis_start`` -> ``cfg.data.analysis_end``
+(2018-01-01 -> 2026-06-18 out of the box).
 
 By default (no ``--live``) the scan runs entirely OFFLINE against the
 deterministic :class:`~qedge.data.synthetic.SyntheticMarket`, so a run is
@@ -27,6 +32,7 @@ from __future__ import annotations
 import argparse
 import sys
 from collections.abc import Sequence
+from datetime import datetime
 
 from qedge.config import QedgeConfig, get_config
 from qedge.data.fmp_adapter import FMPPriceFeed
@@ -84,6 +90,22 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Which book to scan: 'short' (1-10 day cap) or 'long' (~63-day cap).",
     )
     parser.add_argument(
+        "--start",
+        default=None,
+        help=(
+            "Analysis window start date YYYY-MM-DD (inclusive). "
+            "Defaults to cfg.data.analysis_start (2018-01-01)."
+        ),
+    )
+    parser.add_argument(
+        "--end",
+        default=None,
+        help=(
+            "Analysis window end date YYYY-MM-DD (inclusive). "
+            "Defaults to cfg.data.analysis_end (2026-06-18)."
+        ),
+    )
+    parser.add_argument(
         "--live",
         action="store_true",
         help=(
@@ -100,6 +122,18 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     return parser
+
+
+def _valid_date(value: str | None) -> bool:
+    """Return True if ``value`` is None or a well-formed ``YYYY-MM-DD`` date."""
+    if value is None:
+        return True
+    try:
+        # Date-only validation; no timezone is involved for a calendar bound.
+        datetime.strptime(value, "%Y-%m-%d")
+    except ValueError:
+        return False
+    return True
 
 
 def _parse_universe(raw: str) -> tuple[str, ...]:
@@ -130,11 +164,14 @@ def _write_records(
     *,
     horizon: str,
     output_dir: str,
+    start: str,
+    end: str,
 ) -> None:
     """Persist one :class:`~qedge.repro.RunRecord` JSON per scanned symbol.
 
     Each record mirrors the EdgeResult verdict (the same evidence the scorecard
-    shows) and is written under ``output_dir`` keyed by its deterministic run id.
+    shows), stamps the analysis window (``start``/``end``) for the audit trail, and
+    is written under ``output_dir`` keyed by its deterministic run id.
     """
     for result in results:
         record = make_run_record(
@@ -142,6 +179,8 @@ def _write_records(
                 "symbol": result.symbol,
                 "horizon": horizon,
                 "n_trials": result.n_trials,
+                "analysis_start": start,
+                "analysis_end": end,
             },
             data_hashes={"features": result.feature_snapshot_hash},
             metrics={
@@ -172,16 +211,26 @@ def main(argv: list[str] | None = None) -> int:
     if not universe:
         parser.error("--universe must contain at least one symbol")
         return _EXIT_USAGE  # pragma: no cover (parser.error exits)
+    for flag, value in (("--start", args.start), ("--end", args.end)):
+        if not _valid_date(value):
+            parser.error(f"{flag} must be a date in YYYY-MM-DD format, got {value!r}")
+            return _EXIT_USAGE  # pragma: no cover (parser.error exits)
 
     cfg = get_config()
     horizon: Horizon = args.horizon
     output_dir = args.out if args.out is not None else cfg.scanner.output_dir
     feed = _resolve_feed(live=args.live, config=cfg)
+    start = args.start if args.start is not None else cfg.data.analysis_start
+    end = args.end if args.end is not None else cfg.data.analysis_end
 
-    results = run_scan(universe, feed=feed, horizon=horizon, config=cfg)
+    results = run_scan(
+        universe, feed=feed, horizon=horizon, config=cfg, start=start, end=end
+    )
 
     print(scorecard_table(results))
-    _write_records(results, horizon=horizon, output_dir=output_dir)
+    _write_records(
+        results, horizon=horizon, output_dir=output_dir, start=start, end=end
+    )
     return _EXIT_OK
 
 
