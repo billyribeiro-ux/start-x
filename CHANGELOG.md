@@ -7,6 +7,19 @@ Evidence lives in `FINDINGS.md`; the locked study window is **Jan 2019 → Jun 2
 
 ## 2026-06-21
 
+### Decode campaign — Round 1 (5 parallel Opus agents)
+- **TWO real new edges cleared the firewall:** (1) **Reaction-PEAD** — buy the earnings-reaction
+  gap-up, hold 10-20d: OOS +9-13%/yr, t≈2.1, broad (~450 names); (2) **cross-sectional ML ranker**
+  (3-4wk) — market-neutral, net Sharpe 0.79, alpha ~9%, **PBO 0.029, shuffle-canary holds**. Plus a
+  **validated, persistent regime model** (stress regimes = highest fwd returns; re-confirms
+  capitulation-long). See DECODE.md.
+- **Mirages killed:** naive cross-sectional factors (survivorship + crash-beta), cross-asset TSMOM
+  (sample-starved, worse-than-random on 2010+), analyst grades, insider (leakage trap), congress.
+- **Deep verdict:** ~38% of the market is systematic/decodable (market factor + regime), ~62%
+  irreducible at retail cost. Tradeable decode = regime + catalyst + thin ML sleeve, NOT stock-picking.
+- **Data repaired:** deep history pulled to inception (indices/VIX/yields→1990, sectors→1998,
+  bonds→2002) so trend/regime edges test across dot-com + GFC. Survivorship-free universe in progress.
+
 ### Added / Changed (parallel drill — 3 Opus agents)
 - **Leverage drill → default gross_cap 3.0×→1.5×.** Sharpe is invariant to leverage (1.18→1.21 from
   1×→3×) — leverage only amplifies. maxDD scales sub-linearly and the cap rarely binds (mean
