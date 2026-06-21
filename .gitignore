@@ -45,3 +45,7 @@ decoded_*.csv
 .idea/
 .vscode/
 model_trades*.csv
+# Per-horizon book exports (short/long swing + position)
+short_swing*.csv
+long_swing*.csv
+position*.csv
