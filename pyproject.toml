@@ -36,6 +36,7 @@ qedge = [
     "river==0.21.2",
     "ruptures==1.1.9",
     "joblib==1.4.2",
+    "optuna==3.6.1",
     "mypy==1.11.2",
 ]
 
