@@ -35,6 +35,8 @@ meanrev_*.csv
 *_full.csv
 spy_*.csv
 *_capitulation_*.csv
+decoded_*.csv
+*_ensemble_*.csv
 *.png
 *.jpg
 
