@@ -186,6 +186,7 @@ def run_portfolio(
             _empty_ledger(), pd.Series(dtype=float), [], cost_bps))
 
     dates = pd.to_datetime(p["date"])
+    opens = p["open"].to_numpy(dtype=float)
     highs = p["high"].to_numpy(dtype=float)
     lows = p["low"].to_numpy(dtype=float)
     closes = p["close"].to_numpy(dtype=float)
@@ -243,7 +244,10 @@ def run_portfolio(
             stop_level = max(hard, chand)
             exit_price = exit_reason = None
             if lows[i] <= stop_level:
-                exit_price = stop_level
+                # Realistic fill: if the bar GAPPED through the stop (opened beyond it), you fill at
+                # the open, not the stop level. Filling at the stop on a gap-down overstates winners
+                # and hides the true tail loss (e.g. the 2020-02-24 COVID gap was a real -2.9%).
+                exit_price = min(stop_level, opens[i])
                 exit_reason = "chandelier" if chand >= hard else "stop"
             elif i >= t.last_day:
                 exit_price = closes[i]
