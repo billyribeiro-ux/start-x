@@ -1,9 +1,11 @@
 """Flow / catalyst features — one row per as-of date, strictly point-in-time.
 
 For each date ``t`` we look only at catalyst rows whose public timestamp ``ts <= t`` (via
-``pit.trailing``). The single exception is ``days_to_next_earnings``: a *scheduled* future
-earnings date is itself public information today, so counting days to it is PIT-legal; we only
-require that the scheduling row was published on/before ``t`` (no ``epsActual`` yet).
+``pit.trailing``). The single exception is ``days_to_next_earnings``: the *immediate next*
+scheduled earnings date is public information today, so counting days to it is PIT-legal — but
+ONLY within ~one quarter (``_MAX_SCHED_HORIZON_D``). A date further out was not reliably scheduled
+at ``t`` (companies announce the next date weeks-to-a-quarter ahead, not a year), so we drop it
+(NaN) rather than leak a not-yet-announced future date.
 """
 from __future__ import annotations
 
@@ -20,6 +22,9 @@ CONGRESS_WINDOW = 90
 ANALYST_WINDOW = 30
 PRICE_TARGET_WINDOW = 30
 _MACRO_WINDOW = 1
+#: PIT guard for ``days_to_next_earnings``: only the immediate next quarterly date is reliably
+#: scheduled/announced at ``t``. A date more than ~one quarter out wasn't knowable, so we NaN it.
+_MAX_SCHED_HORIZON_D = 92
 
 
 def _empty_row(date: pd.Timestamp) -> dict:
@@ -119,15 +124,16 @@ def _earnings(row: dict, df: pd.DataFrame, t: pd.Timestamp) -> None:
         if pd.notna(est) and pd.notna(act) and est not in (0, None):
             row["last_eps_surprise"] = float((act - est) / abs(est))
 
-    # Next *scheduled* earnings: the chronologically next earnings *date* after t. A quarterly
-    # earnings date is announced well in advance, so "days until the next earnings date" is
-    # PIT-knowable. We deliberately do NOT gate on epsActual being NaN: the catalyst feed is a
-    # snapshot fetched today, so a date that was future at t may now carry a backfilled actual.
-    # Keying on the date alone (not the presence of an actual) is what stays PIT-honest here.
+    # Next *scheduled* earnings: the chronologically next earnings *date* after t. We do NOT gate on
+    # epsActual being NaN (the feed is a snapshot fetched today, so a date future at t may now carry
+    # a backfilled actual — keying on the date alone is what stays PIT-honest). BUT a date more than
+    # ~one quarter out was not reliably scheduled/announced at t, so counting days to it would leak a
+    # not-yet-known future date: we clip the horizon to _MAX_SCHED_HORIZON_D and NaN anything beyond.
     future_mask = ts.notna() & (ts > t)
     fut = df[future_mask].assign(_ts=ts[future_mask]).sort_values("_ts")
     if not fut.empty:
-        row["days_to_next_earnings"] = float((fut.iloc[0]["_ts"] - t).days)
+        days = float((fut.iloc[0]["_ts"] - t).days)
+        row["days_to_next_earnings"] = days if days <= _MAX_SCHED_HORIZON_D else np.nan
 
 
 def _macro(row: dict, df: pd.DataFrame, t: pd.Timestamp) -> None:

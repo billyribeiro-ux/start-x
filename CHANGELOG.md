@@ -7,6 +7,21 @@ Evidence lives in `FINDINGS.md`; the locked study window is **Jan 2019 → Jun 2
 
 ## 2026-06-21
 
+### Fixed (the three flagged known-limitations — "get everything fixed")
+- **`days_to_next_earnings` PIT leak closed.** `features/flow.py` counted days to the next future
+  earnings date regardless of whether it was scheduled/announced at `t` — leaking a not-yet-known
+  date (the docstring even claimed a publish-date gate the code never implemented). Now clipped to
+  ~one quarter (`_MAX_SCHED_HORIZON_D=92`): a date >92d out → NaN. Docstrings reconciled; regression
+  test added (far-future → NaN, within-quarter still counted).
+- **Fresh-cache breadth/internals.** `backfill.py` warmed only the 7 seed symbols + context series,
+  so a clean clone had no S&P 500 constituent prices and `compute_internals` (which silently skips
+  missing files) produced EMPTY breadth — the guarded model's IBS sleeve would have no guard. backfill
+  now warms the ~500 constituents and rebuilds `data/cache/internals.parquet` (with a `--no-breadth`
+  escape for a fast warm).
+- **Aux-script windows aligned to the locked 2019 start.** `validate.py` (2015→2019),
+  `export_trades.py` (2018→2019), and `highconf_eval.py` `--train-start` (2018→2019) defaulted outside
+  the locked study window; now consistent with the production runner (`run_book.py` already 2019).
+
 ### Audit confirmation round — end-to-end verification + the genuinely-open fixes
 A second meta-audit was confirmed claim-by-claim against the CURRENT tree. Its corrections to the
 first pass were re-verified TRUE: production does NOT violate the locked rules — `run_book.py` BOOKS

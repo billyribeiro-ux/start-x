@@ -65,7 +65,7 @@ _DEFAULT_OUT = _REPO_ROOT / "spy_spx_highconf_trades.csv"
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--tickers", default="SPY,SPX")
-    ap.add_argument("--train-start", default="2018-01-01")
+    ap.add_argument("--train-start", default="2019-01-01")
     ap.add_argument("--eval-start", default="2023-01-01")
     ap.add_argument("--end", default="2026-06-19")
     ap.add_argument("--horizon", default="long")

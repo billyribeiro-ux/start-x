@@ -1,7 +1,7 @@
 """Export every out-of-sample trade with FULL mechanics: entry, target, stop, exit, PnL.
 
 Usage:
-    python scripts/export_trades.py --tickers SPY,SPX --horizon long --start 2018-01-01 \
+    python scripts/export_trades.py --tickers SPY,SPX --horizon long --start 2019-01-01 \
         --mode pooled --out trades.csv
 
 Each trade carries its triple-barrier TARGET (profit-take) and STOP (loss) prices, the
@@ -115,7 +115,7 @@ def _enrich(symbol: str, bt: BacktestResult, prices: pd.DataFrame, horizon: str)
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--start", default="2018-01-01")
+    ap.add_argument("--start", default="2019-01-01")
     ap.add_argument("--end", default="2026-06-01")
     ap.add_argument("--horizon", default="long", choices=["short", "long"])
     ap.add_argument("--mode", default="pooled", choices=["pooled", "per_symbol"])

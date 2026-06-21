@@ -107,6 +107,24 @@ def test_flow_news_and_earnings_pit():
     assert feats["days_to_next_earnings"] == pytest.approx((pd.Timestamp("2024-08-01") - asof).days)
 
 
+def test_days_to_next_earnings_far_future_is_nan():
+    """PIT guard: a next-earnings date more than ~one quarter out was not reliably scheduled at t,
+    so days_to_next_earnings must be NaN rather than leaking a not-yet-announced future date."""
+    asof = pd.Timestamp("2024-06-10")
+    earnings = pd.DataFrame({
+        "ts": pd.to_datetime(["2024-05-01", "2025-02-01"]),  # next is ~237 days out (> 92)
+        "epsActual": [1.20, np.nan],
+        "epsEstimated": [1.00, 1.30],
+    })
+    feats = flow_features([asof], {"earnings": earnings}).iloc[0]
+    assert pd.isna(feats["days_to_next_earnings"])
+    # ...but a within-quarter date is still counted (control).
+    earnings_near = earnings.copy()
+    earnings_near["ts"] = pd.to_datetime(["2024-05-01", "2024-07-15"])  # ~35 days out
+    near = flow_features([asof], {"earnings": earnings_near}).iloc[0]
+    assert near["days_to_next_earnings"] == pytest.approx(35.0)
+
+
 # --------------------------------------------------------------------------------------------
 # (b) TECHNICAL: uptrend -> momentum > 0, RSI > 50, no close/fwd columns.
 # --------------------------------------------------------------------------------------------

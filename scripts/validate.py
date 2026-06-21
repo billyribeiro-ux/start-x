@@ -1,7 +1,7 @@
 """Run the full out-of-sample strategy validation on the seed universe.
 
 Usage:
-    python scripts/validate.py [--start 2015-01-01] [--end 2026-06-01]
+    python scripts/validate.py [--start 2019-01-01] [--end 2026-06-01]
                                [--horizon short|long] [--mode pooled|per_symbol|both]
 
 Prints, for each model, the out-of-sample scoreboard (Sharpe, deflated Sharpe, CAGR, max
@@ -43,7 +43,7 @@ def _print(res: StrategyResult) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--start", default="2015-01-01")
+    ap.add_argument("--start", default="2019-01-01")
     ap.add_argument("--end", default="2026-06-01")
     ap.add_argument("--horizon", default="short", choices=["short", "long"])
     ap.add_argument("--mode", default="both", choices=["pooled", "per_symbol", "both"])
