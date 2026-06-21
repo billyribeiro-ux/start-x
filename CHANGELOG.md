@@ -7,6 +7,26 @@ Evidence lives in `FINDINGS.md`; the locked study window is **Jan 2019 → Jun 2
 
 ## 2026-06-21
 
+### Re-investigated the mean-reversion entry on the recent window (3 parallel Opus agents) — RE-VALIDATED
+User shortened the study window to Jan 2025→Jun 2026 and distrusted RSI-2. A fresh end-to-end re-test
+(RSI-2 verdict / IBS threshold recalibration / broaden-the-search), measuring **drift-adjusted alpha**
+(the bull gets no credit) under the production exit, across recent + 2019-26 + deep history (SPY 1993,
+^GSPC 1990, QQQ 1999):
+- **RSI-2 re-confirmed DEAD.** Production drift-adjusted alpha negative in every window (locked 2019-26
+  **−0.232%, t −2.60** — reproduces the documented −0.22% to the bp). It looks alive only on the raw
+  forward-return lens; under the 1-ATR stop it is stopped out **55%** of the time (a fresh oversold
+  *cross* fires deeper into momentum selloffs, into the stop). Stays legacy `signal="rsi2"`.
+- **IBS<0.10 + 200-SMA filter re-confirmed the cross-validated optimum — NO recalibration.** 0.10 is the
+  realistic-Sharpe winner on BOTH SPY (+0.80) and ^GSPC (+0.79) and the **only threshold positive across
+  all 5 disjoint sub-periods**; the trend filter raises per-trade P&L/PF at every threshold (the dips it
+  excludes are junk). The recent ~7-21-trade window has zero power to change the calibration (t≈1.2, CI
+  straddles 0).
+- **"The market changed" thesis NOT supported.** No alternative oversold trigger (2-day low, %B<0.05,
+  W%R<−90, down-3, RSI(2)<5, lower-band) beats IBS<0.10 robustly — the deep-oversold ones win only on
+  raw close-to-close alpha and DIE under the hard stop (catch the falling knife, 33-40% win, 58%
+  stopped). IBS is #1 by realistic Sharpe on every headline cut; if anything its edge is LARGER recently
+  (QQQ 2019→now alpha +0.82, t 3.6). **No code change — production entry is already IBS<0.10.**
+
 ### Closed the honesty gaps (5 parallel Opus agents) — measured OOS evidence, negatives included
 The remaining "rests on assumptions" items are now hard out-of-sample numbers:
 - **Cross-instrument (thin-sample gap).** All three books on SPY/^GSPC/QQQ/IWM. The edges REPLICATE
