@@ -68,7 +68,7 @@ MODELS = {
 #: sleeve — a short-term dip vs a long-term trend/capitulation ride. One global exit is wrong.
 EXITS = {
     "breakout": (1.0, 3.0, 252),   # long-term trend: 1-ATR stop, 3-ATR trail, ride for months
-    "fear":     (1.0, 3.0, 90),    # capitulation bounce: 1-ATR stop, 3-ATR trail, weeks-to-a-quarter
+    "fear":     (1.0, 3.0, 252),   # capitulation: 1-ATR stop, 3-ATR trail, ride to exhaustion (the chandelier exits)
     "ibs":      (1.0, 3.0, 10),    # SHORT-TERM dip (1-10d): 1-ATR stop, 3-ATR trail, ~2-week hard cap
 }
 

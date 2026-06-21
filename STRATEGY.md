@@ -30,7 +30,7 @@ Mechanically, each open trade tracks two levels off ATR(14) at entry:
 | Sleeve | hard stop | chandelier | max hold | why |
 |---|---|---|---|---|
 | **breakout** | 1 ATR | 3 ATR | **252 d** | long-term trend — ride it for months (the home-runner) |
-| **fear** | 1 ATR | 3 ATR | **90 d** | capitulation bounce — weeks to a quarter |
+| **fear** | 1 ATR | 3 ATR | **252 d** | capitulation — ride to exhaustion (the chandelier exits) |
 | **ibs** | 1 ATR | 3 ATR | **10 d** | SHORT-TERM dip (1–10 days) — quick mean-reversion, never a year |
 
 ---
@@ -62,7 +62,7 @@ Mechanically, each open trade tracks two levels off ATR(14) at entry:
   - **VVIX** (vol-of-vol) **≥ its trailing-year 90th percentile** (dealer-hedging / convexity stress).
   - VRP and VVIX are two lenses on the same fear and are counted **once** (merged) so a vol spike
     books a single position, not two; the engine also refuses two positions at the same bar/price.
-- **EXIT:** 1-ATR hard stop, 3-ATR chandelier, max 90 days (let the rebound develop).
+- **EXIT:** 1-ATR hard stop, 3-ATR chandelier, max 252 days (ride to exhaustion).
 - **Why it exists:** you get paid to provide liquidity / sell insurance into panic. Durable risk
   premium but **not alpha** over the index — sized small, kept as a diversifier (low correlation to
   the trend sleeve).

@@ -14,6 +14,15 @@ Evidence lives in `FINDINGS.md`; the locked study window is **Jan 2019 → Jun 2
   `min(stop_level, open)`. Honest re-baseline FULL 2019-26: base +120.5% / PF 2.72 / maxDD -15.2%;
   guarded +135.4% / PF 3.22 / maxDD -13.4% / Sharpe 0.79. Worst single loss now -2.94%.
 
+### Fixed (ledger drill)
+- **Gap-aware fills** (above).
+- **Fear sleeve no longer cuts its runner.** Drill found the fear 90-day cap time-exited the +29.8%
+  COVID capitulation winner (same pattern as the breakout time-cap). Fear cap 90→252 (chandelier is
+  the real exit): FULL 2019-26 +120.5%→+127.7%, PF 2.72→2.88, Sharpe 0.73→0.76, same -15.2% maxDD.
+- **Noted (by design, not a bug):** peak concurrent GROSS leverage reaches the 3.0× cap — the book
+  can be up to ~3× long SPY at once (amplifies both return and drawdown); risk is held by the 1-ATR
+  stops + 12% summed-risk cap (realised maxDD -15%).
+
 ### Changed (exit logic — user-directed)
 - **Per-sleeve exits + the explicit stop/target rule** (user-found): the engine was applying ONE
   exit (3-ATR stop, 252-day cap) to every sleeve regardless of horizon — wrong for the short-term
