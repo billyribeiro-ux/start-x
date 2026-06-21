@@ -7,6 +7,15 @@ Evidence lives in `FINDINGS.md`; the locked study window is **Jan 2019 → Jun 2
 
 ## 2026-06-21
 
+### Fixed (realism — ledger audit)
+- **Gap-aware fills.** A ledger audit found 13 trades filling OUTSIDE the exit day's range: stops
+  were filled at the exact stop level even when the bar GAPPED through it, overstating winners and
+  hiding the tail (the 2020-02-24 COVID gap looked like -1.0% but was really -2.9%). Now fills at
+  `min(stop_level, open)`. Honest re-baseline FULL 2019-26: base +120.5% / PF 2.72 / maxDD -15.2%;
+  guarded +135.4% / PF 3.22 / maxDD -13.4% / Sharpe 0.79. Worst single loss now -2.94%.
+
+## 2026-06-21
+
 ### Changed (exit logic — user-directed)
 - **Per-sleeve exits + the explicit stop/target rule** (user-found): the engine was applying ONE
   exit (3-ATR stop, 252-day cap) to every sleeve regardless of horizon — wrong for the short-term
