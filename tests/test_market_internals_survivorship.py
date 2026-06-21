@@ -12,6 +12,7 @@ import os
 import warnings
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -51,6 +52,23 @@ def test_survivorship_warning_silenceable(monkeypatch):
         warnings.simplefilter("always")
         mi.compute_internals()
     assert not [w for w in caught if "survivorship" in str(w.message)], "warning not silenced"
+
+
+# ---- C: not_breaking_down must NOT block a trade on absent internals (audit Finding) ----------
+def test_not_breaking_down_true_on_missing_internals():
+    """Missing internals -> True (do not block). NaN must coerce to True BEFORE the comparison;
+    `np.nan > x` is False (would wrongly block) and leaves no NaN for a trailing fillna to catch."""
+    prices = pd.DataFrame({"date": pd.bdate_range("2024-01-01", periods=10),
+                           "open": 1.0, "high": 1.0, "low": 1.0, "close": 1.0})
+    # internals that don't overlap the price dates -> all-NaN after reindex
+    internals = pd.DataFrame({"date": pd.bdate_range("2000-01-01", periods=5),
+                              "ud_vol": [50.0, 50.0, 50.0, 50.0, 50.0]})
+    out = mi.not_breaking_down(internals, prices)
+    assert out.dtype == bool and len(out) == 10
+    assert out.all(), "absent internals must resolve to True (don't block the trade)"
+    # and a genuine breakdown (low up-volume) still blocks
+    internals2 = pd.DataFrame({"date": prices["date"], "ud_vol": [5.0] * 10})  # 5% up-vol = breakdown
+    assert not mi.not_breaking_down(internals2, prices, ud_vol_min=20.0).any()
 
 
 def test_datefirstadded_gate_is_effective(monkeypatch):

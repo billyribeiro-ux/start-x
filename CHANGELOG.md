@@ -7,6 +7,32 @@ Evidence lives in `FINDINGS.md`; the locked study window is **Jan 2019 → Jun 2
 
 ## 2026-06-21
 
+### Forensic re-audit (6 parallel Opus agents) — verdict: no faked edge
+A full-codebase hostile forensic sweep with reproducible probes. **The core is CLEAN:** the production
+money path (engine/run_book) has no lookahead / cap-defeat / cost-double-charge (all recent fixes
+re-verified PASS, in-window Sharpe 1.163 == manual); the signal sleeves are lookahead-clean (8/8
+PIT-truncation probes); the feature matrix is point-in-time (shuffle-label canary AUC 0.489, planted
+leak 0.989); and the validation firewall (purge/embargo, CPCV, deflated-Sharpe, PBO, feature
+allow-list) is mathematically correct. **The System #1/#2 locks rest on sound foundations.** The
+defects found are confined to (a) the price-cache coverage wiring, (b) the research-only causal-
+attribution engine, and (c) the abandoned `prob_up` ML pipeline — none touch the three-book P&L.
+
+### Fixed (forensic re-audit — strategy)
+- **`not_breaking_down` no longer blocks trades on ABSENT internals.** Its contract is "missing → True
+  (don't block)", but `np.nan > x` is False, so missing breadth silently BLOCKED the IBS dip (and the
+  trailing `.fillna(True)` was a dead no-op). NaN now coerces to True before the comparison. 0 days
+  affected in the locked 2019-26 window (internals dense there); 4,265 deep-history days were wrongly
+  suppressed. Regression test added.
+- **Breadth reads constituents under the cache's sanitized filename.** `compute_internals` read
+  `prices/{sym}.parquet` raw while `get_prices` writes the cache-sanitized name — a dotted class share
+  (`BRK.B` → `BRK_B.parquet`) would silently drop from breadth. Now mirrors the cache `_SAFE` regex.
+- **`vix_capitulation.backtest` outcome now WIN/SCRATCH/LOSS** (was binary — the one sleeve helper
+  missed in the earlier harmonization), matching `engine._ledger_row` and the locked rule.
+
+_Remaining forensic fixes — cache-coverage wiring (HIGH), attribution intraday-leakage gate (HIGH),
+ensemble deflated-Sharpe formula, and validation purge/PurgedKFold/allow-list hardening — are landing
+via a parallel fix fleet and will be committed as each is verified._
+
 ### Fixed (the three flagged known-limitations — "get everything fixed")
 - **`days_to_next_earnings` PIT leak closed.** `features/flow.py` counted days to the next future
   earnings date regardless of whether it was scheduled/announced at `t` — leaking a not-yet-known

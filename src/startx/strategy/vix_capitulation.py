@@ -148,7 +148,8 @@ def backtest(index_prices: pd.DataFrame, vix: pd.DataFrame, *, neutral="adaptive
             pnl_per_share=round((float(ep) - e) - e * cost, 2),
             vix_level=round(float(vlevel.get(d, np.nan)), 1),
             atr_pct=round(a / e * 100, 2), mfe_pct=round(mfe * 100, 2),
-            outcome=("WIN" if (float(ep) / e - 1) - cost > 0 else "LOSS"),
+            outcome=("WIN" if (float(ep) / e - 1) - cost > 0
+                     else "SCRATCH" if (float(ep) / e - 1) - cost == 0 else "LOSS"),
         ))
     trades = pd.DataFrame(rows)
     return trades, _stats(trades)

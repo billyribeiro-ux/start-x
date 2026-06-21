@@ -30,10 +30,16 @@ Point-in-time — what IS and ISN'T enforced (be precise, don't oversell it):
 from __future__ import annotations
 
 import os
+import re
 import warnings
 
 import numpy as np
 import pandas as pd
+
+#: Mirror the cache's per-segment filename sanitizer (data/cache.py `_SAFE`) so a constituent's
+#: parquet is read under the SAME name `get_prices` wrote it (e.g. a dotted class share `BRK.B` →
+#: `BRK_B.parquet`); otherwise a dotted ticker silently drops out of the breadth panel.
+_SAFE_SYM = re.compile(r"[^A-Za-z0-9_-]")
 
 _INTERNALS_CACHE = "data/cache/internals.parquet"
 _MEMBERS_CACHE = "data/cache/sp500_members.parquet"
@@ -81,7 +87,7 @@ def compute_internals(client=None) -> pd.DataFrame:
     members = _constituents(client)
     closes, highs, lows, vols = {}, {}, {}, {}
     for sym in members["symbol"]:
-        f = f"data/cache/prices/{sym}.parquet"
+        f = f"data/cache/prices/{_SAFE_SYM.sub('_', sym)}.parquet"
         if not os.path.exists(f):
             continue
         d = pd.read_parquet(f, columns=["date", "close", "high", "low", "volume"])
@@ -175,8 +181,12 @@ def not_breaking_down(internals: pd.DataFrame, prices: pd.DataFrame, *,
     I = internals.copy(); I["date"] = pd.to_datetime(I["date"])
     ud = I.sort_values("date").set_index("date")["ud_vol"]
     p = prices.sort_values("date").reset_index(drop=True)
-    aligned = ud.reindex(pd.to_datetime(p["date"])).ffill(limit=2)
-    return pd.Series((aligned.to_numpy() > ud_vol_min), index=p.index).fillna(True).astype(bool)
+    aligned = ud.reindex(pd.to_datetime(p["date"])).ffill(limit=2).to_numpy()
+    # Missing internals -> True (DON'T block a trade on absent data). NaN must be coerced to True
+    # BEFORE the comparison: `np.nan > x` is False, which would (wrongly) block — and since the
+    # comparison leaves no NaN behind, a trailing .fillna(True) is a dead no-op.
+    ok = np.where(np.isnan(aligned), True, aligned > ud_vol_min)
+    return pd.Series(ok, index=p.index).astype(bool)
 
 
 def breadth_tag(internals: pd.DataFrame, date: pd.Timestamp) -> str:
