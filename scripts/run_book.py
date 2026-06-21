@@ -1,18 +1,21 @@
-"""Run the production portfolio book end-to-end and (optionally) export the trade ledger.
+"""Run a production portfolio book end-to-end and (optionally) export the trade ledger.
 
-Wires the validated sleeves into the portfolio engine, annotates every trade with a human-readable
-PM thesis + conviction + regime (the `thesis` layer), and scores the *real* book ledger with the
-validation scorecard (deflated Sharpe / PBO / drift-adjusted alpha).
+THREE SEPARATE BOOKS, one per holding horizon — they are NOT mixed in one book (mixing a 1-10 day
+dip with a multi-month trend ride under one exit rule is exactly what produced the 134-bar hold
+inside a "swing" book). Each book is its own system with its own exit clock:
 
-TWO MODELS are kept side by side so we can race them (the market-internals breadth guard is a risk
-filter whose value shows up in stress, so we judge it head-to-head, not by assertion):
-  • **base**    — IBS dip sleeve UNGATED (more trades, more raw return, deeper drawdown).
-  • **guarded** — IBS dip sleeve guarded by market internals (skip dips into a broad-breakdown /
-                  heavy-down-volume day; higher win-rate, lower drawdown, small raw-return give-up).
+  • short_swing — SHORT-TERM SWING, 1-10 trading days. Oversold dip-buy in an uptrend (IBS<0.1).
+  • long_swing  — LONG-TERM SWING, weeks to ~3 months. Trend breakout + fear capitulation.
+  • position    — POSITION / PORTFOLIO, a long hold (months-to-years), 200-SMA trend core.
 
-    python scripts/run_book.py                                  # both models, full window, compared
-    python scripts/run_book.py --start 2023-01-01 --out book.csv --model both
-    python scripts/run_book.py --model guarded                  # one model only
+Within a book TWO MODELS are raced (the market-internals breadth guard is a risk filter judged
+head-to-head, not by assertion):
+  • base    — sleeves UNGATED (more trades, more raw return, deeper drawdown).
+  • guarded — dip/entry breadth-guarded (skip entries into a broad-breakdown / heavy-down-volume day).
+
+    python scripts/run_book.py                                   # short_swing, both models, full window
+    python scripts/run_book.py --book long_swing --out book.csv  # the weeks-to-months book
+    python scripts/run_book.py --book short_swing --start 2025-01-01 --end 2026-06-19 --out s.csv
 """
 from __future__ import annotations
 
@@ -25,7 +28,6 @@ import pandas as pd
 
 from startx.portfolio import run_portfolio
 from startx.portfolio.thesis import annotate_theses, summarize_book
-from startx.portfolio.validate import confidence_scorecard
 from startx.strategy.mean_reversion import ibs_signals
 from startx.strategy.momentum_breakout import breakout_signals
 from startx.strategy.volatility_premium import fear_signals
@@ -56,20 +58,32 @@ def _ibs_guarded(s, a):
     return (ibs_signals(s).reset_index(drop=True) & not_breaking_down(a["internals"], s)).astype(bool)
 
 
-#: Both books kept side by side. Only the IBS sleeve differs (ungated vs breadth-guarded); breakout
-#: and the merged VRP∪VVIX `fear` sleeve are identical across models.
-MODELS = {
-    "base": {"breakout": _breakout, "ibs": _ibs_ungated, "fear": _fear},
-    "guarded": {"breakout": _breakout, "ibs": _ibs_guarded, "fear": _fear},
-}
-
-#: Per-sleeve exit = (HARD STOP ATR mult, CHANDELIER ATR mult, MAX hold in trading days).
-#: Rule: 1-ATR hard stop cuts the loss short; 3-ATR chandelier rides the winner. Horizon differs by
-#: sleeve — a short-term dip vs a long-term trend/capitulation ride. One global exit is wrong.
-EXITS = {
-    "breakout": (1.0, 3.0, 252),   # long-term trend: 1-ATR stop, 3-ATR trail, ride for months
-    "fear":     (1.0, 3.0, 252),   # capitulation: 1-ATR stop, 3-ATR trail, ride to exhaustion (the chandelier exits)
-    "ibs":      (1.0, 3.0, 10),    # SHORT-TERM dip (1-10d): 1-ATR stop, 3-ATR trail, ~2-week hard cap
+# ------------------------------------------------------------------------------------------- #
+# THREE horizon-separated books. Each carries its OWN sleeve membership (per model) and its OWN
+# per-sleeve exits = (HARD STOP ATR mult, CHANDELIER ATR mult, MAX hold in trading days). The
+# rule is the same everywhere — 1-ATR hard stop cuts the loss, 3-ATR chandelier rides the winner
+# — but the MAX-HOLD clock is the horizon, and that is what differs by book.
+# ------------------------------------------------------------------------------------------- #
+BOOKS: dict[str, dict] = {
+    "short_swing": {
+        "desc": "SHORT-TERM SWING — 1-10 trading days. Oversold dip-buy in an uptrend (IBS<0.1); "
+                "1-ATR stop, 3-ATR chandelier, HARD 10-day cap.",
+        "models": {"base": {"ibs": _ibs_ungated}, "guarded": {"ibs": _ibs_guarded}},
+        "exits": {"ibs": (1.0, 3.0, 10)},      # 1-10 trading days — a true short swing
+    },
+    "long_swing": {
+        "desc": "LONG-TERM SWING — weeks to ~3 months. Trend breakout + fear capitulation; "
+                "1-ATR stop, 3-ATR chandelier, ~3-month (63-day) cap.",
+        "models": {"base": {"breakout": _breakout, "fear": _fear},
+                   "guarded": {"breakout": _breakout, "fear": _fear}},
+        "exits": {"breakout": (1.0, 3.0, 63), "fear": (1.0, 3.0, 63)},  # weeks → ~3 months
+    },
+    "position": {
+        "desc": "POSITION / PORTFOLIO — long hold (months to years). 200-SMA trend core; "
+                "1-ATR stop, 3-ATR chandelier, multi-year (504-day) backstop.",
+        "models": {"base": {"breakout": _breakout}, "guarded": {"breakout": _breakout}},
+        "exits": {"breakout": (1.0, 3.0, 504)},  # ride a long position to exhaustion
+    },
 }
 
 
@@ -105,7 +119,7 @@ def _write_ledger(led: pd.DataFrame, path: str) -> int:
     return len(body)
 
 
-def _enrich_logic(led: pd.DataFrame) -> pd.DataFrame:
+def _enrich_logic(led: pd.DataFrame, exits: dict) -> pd.DataFrame:
     """Make every trade self-documenting: spell out its entry rule, stop %, exit rule, and P&L."""
     if led.empty:
         return led
@@ -118,42 +132,41 @@ def _enrich_logic(led: pd.DataFrame) -> pd.DataFrame:
 
     # --- R-multiple: read the journal in units of RISK, not just % -----------------------
     # The R unit is the trade's initial 1-ATR risk distance — the fractional gap from entry to
-    # the HARD stop (EXITS uses a 1-ATR hard stop for every sleeve, so stop_price == entry -
-    # 1*ATR). `risk_pct` is that distance as a %, `R` re-expresses the realised return `ret` in
-    # those units: a +1.5% gain on a 1.0%-wide stop is +1.5R; a clean stop-out is ~-1R, and a
-    # gap-through (filled below the stop) prints worse than -1R — the realistic tail.
+    # the HARD stop (every sleeve uses a 1-ATR hard stop, so stop_price == entry - 1*ATR).
     risk_frac = (led["stop_price"] / led["entry_price"] - 1.0).abs()  # 1-ATR risk distance (fraction)
     led["risk_pct"] = (risk_frac * 100).round(3)                      # the R unit, in %
-    # ret is already a fraction (net of cost); divide by the risk fraction to get risk units.
     led["R"] = (led["ret"] / risk_frac.where(risk_frac > 0)).round(3)  # NaN-safe on a 0-width stop
 
     def _exit_rule(sl: str) -> str:
-        sm, cm, md = EXITS.get(sl, (1.0, 3.0, 252))
+        sm, cm, md = exits.get(sl, (1.0, 3.0, 252))
         return (f"EXIT: {cm:.0f}-ATR chandelier trail (ride the winner) + {sm:.0f}-ATR hard stop "
                 f"(cut the loss); hard cap {md} trading days.")
     led["exit_rule"] = led["sleeve"].map(_exit_rule)
     return led
 
 
-def _run_one(name, sleeves, spy, aux, start, end, out, gross_cap, entry_fill):
-    res = run_portfolio(spy, aux, sleeves, exits=EXITS, gross_cap=gross_cap,
+def _run_one(name, sleeves, exits, spy, aux, start, end, out, gross_cap, entry_fill):
+    res = run_portfolio(spy, aux, sleeves, exits=exits, gross_cap=gross_cap,
                         entry_fill=entry_fill, start=start, end=end)
     s = res.stats
     print(f"\n=== MODEL: {name} ===")
     print(f"  n={s['n']} win={s['win_rate']*100:.0f}% total={s['total_return']*100:+.1f}% "
           f"maxDD={s['max_drawdown']*100:.1f}% PF={s['profit_factor']:.2f} "
           f"Sharpe={s.get('ann_sharpe', float('nan')):.2f} exposure={s.get('exposure', 0)*100:.0f}%")
-    led = _enrich_logic(annotate_theses(res.ledger, spy, aux))
+    led = _enrich_logic(annotate_theses(res.ledger, spy, aux), exits)
     led.insert(0, "model", name)
+    if not led.empty:
+        print(f"  holds: min={int(led['bars_held'].min())}d  "
+              f"max={int(led['bars_held'].max())}d  median={led['bars_held'].median():.0f}d")
     print("  BOOK NOW:", summarize_book(led))
     if out:
         path = out.replace(".csv", f"_{name}.csv")
-        n = _write_ledger(led, path)
-        print(f"  wrote {n} trades (+ TOTAL WIN $/LOSS $/NET $ block) -> {path}")
+        nrows = _write_ledger(led, path)
+        print(f"  wrote {nrows} trades (+ TOTAL WIN $/LOSS $/NET $ block) -> {path}")
     return s, led
 
 
-def _stress_grid(spy, aux, names, gross_cap, entry_fill):
+def _stress_grid(spy, aux, names, models, exits, gross_cap, entry_fill):
     """Both models across regimes, so their regime-dependence is visible at a glance."""
     windows = [("2019-22 (incl. bear)", "2019-01-01", "2022-12-31"),
                ("2023-26 (bull)", "2023-01-01", "2026-06-19"),
@@ -162,7 +175,7 @@ def _stress_grid(spy, aux, names, gross_cap, entry_fill):
     print(f"  {'window':22}{'model':9}{'n':>4}{'win':>6}{'total':>9}{'PF':>7}{'maxDD':>8}{'Sharpe':>8}")
     for wl, st, en in windows:
         for m in names:
-            s = run_portfolio(spy, aux, MODELS[m], exits=EXITS, gross_cap=gross_cap,
+            s = run_portfolio(spy, aux, models[m], exits=exits, gross_cap=gross_cap,
                               entry_fill=entry_fill, start=st, end=en).stats
             print(f"  {wl:22}{m:9}{s['n']:4}{s['win_rate']*100:5.0f}%{s['total_return']*100:+8.1f}%"
                   f"{s['profit_factor']:7.2f}{s['max_drawdown']*100:7.1f}%{s.get('ann_sharpe', 0):8.2f}")
@@ -170,9 +183,10 @@ def _stress_grid(spy, aux, names, gross_cap, entry_fill):
 
 def main() -> None:
     ap = argparse.ArgumentParser()
+    ap.add_argument("--book", default="short_swing", choices=list(BOOKS),
+                    help="which horizon-separated book to run (default short_swing = 1-10 day)")
     ap.add_argument("--start", default="2019-01-01")
     ap.add_argument("--end", default="2026-06-19")
-    ap.add_argument("--n-trials", type=int, default=10, dest="n_trials")
     ap.add_argument("--model", default="both", choices=["base", "guarded", "both"])
     ap.add_argument("--out", default=None, help="write the annotated ledger(s) to this CSV")
     ap.add_argument("--stress", action="store_true", help="print the models × regimes stress grid")
@@ -182,16 +196,20 @@ def main() -> None:
                     help="fill entries at the signal-day close (default) or the next bar's open")
     args = ap.parse_args()
 
+    book = BOOKS[args.book]
+    models, exits = book["models"], book["exits"]
+
     spy = _load("SPY"); spy.attrs["symbol"] = "SPY"
     aux = {"vix": _load("_VIX"), "vvix": _load("_VVIX"), "gld": _load("GLD"),
            "internals": load_internals()}
 
     names = ["base", "guarded"] if args.model == "both" else [args.model]
-    print(f"PRODUCTION BOOK  {args.start} -> {args.end}  "
+    print(f"BOOK: {args.book}  —  {book['desc']}")
+    print(f"WINDOW {args.start} -> {args.end}  "
           f"(models: {', '.join(names)} | gross_cap {args.gross_cap}x | entry {args.entry_fill})")
     stats, ledgers = {}, []
     for n in names:
-        s, led = _run_one(n, MODELS[n], spy, aux, args.start, args.end, args.out,
+        s, led = _run_one(n, models[n], exits, spy, aux, args.start, args.end, args.out,
                           args.gross_cap, args.entry_fill)
         stats[n] = s; ledgers.append(led)
 
@@ -211,7 +229,7 @@ def main() -> None:
         print(f"\nwrote {nc} trades (all models, + TOTAL WIN $/LOSS $/NET $ block) -> {allp}")
 
     if args.stress:
-        _stress_grid(spy, aux, names, args.gross_cap, args.entry_fill)
+        _stress_grid(spy, aux, names, models, exits, args.gross_cap, args.entry_fill)
 
 
 if __name__ == "__main__":

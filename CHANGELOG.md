@@ -7,6 +7,27 @@ Evidence lives in `FINDINGS.md`; the locked study window is **Jan 2019 → Jun 2
 
 ## 2026-06-21
 
+### Changed (architecture — THREE horizon-separated books, user-directed)
+- **The mixed book is split into three separate systems, one per holding horizon.** Jamming a
+  1-10 day dip and a multi-month trend ride into ONE book under ONE exit rule is exactly what
+  produced the 134-bar ("WTF") hold inside a "swing" book — the chandelier was riding a trend to
+  exhaustion (correct for a long-term swing) but the position lived in a book the desk reads as
+  short-term. Fix: `scripts/run_book.py` now selects a `--book` (default `short_swing`), each with
+  its OWN sleeve membership and its OWN max-hold clock:
+  - **short_swing** — 1-10 trading days. IBS<0.1 oversold dip-buy in an uptrend. Exit: 1-ATR stop,
+    3-ATR chandelier, **HARD 10-day cap**.
+  - **long_swing** — weeks to ~3 months. Breakout + fear capitulation. Exit: 1-ATR / 3-ATR, 63-day cap.
+  - **position** — long hold (months-to-years). 200-SMA trend core. Exit: 1-ATR / 3-ATR, 504-day backstop.
+  The 1-ATR-stop / 3-ATR-chandelier rule is identical across books; only the MAX-HOLD differs — that
+  is the horizon. "Don't cut home-runners" now means *within a book's horizon*, so a short-swing
+  winner is still capped at 10 days while a position winner rides for months.
+- **System #1 (short_swing) locked & OOS-validated.** Holds 1-10d only; positive in BOTH train
+  (2019-22 incl. bear) and test (2023-26 bull). FULL 2019-26 @ 1.5×: **guarded** 29 trades, 59% win,
+  +22.2%, PF 2.61, maxDD **−3.6%**, Sharpe 0.40; **base** 41 trades, 51% win, +26.7%, PF 2.20,
+  maxDD −6.3%. The breadth guard wins win-rate / PF / drawdown in every regime (half the DD for a
+  modest return give-up). Jan 2025→Jun 2026 slice: guarded NET +$39.84/sh (5 trades), base
+  +$40.51/sh (7 trades). long_swing + position books are scaffolded next (not yet calibrated).
+
 ### Fixed (ledger layout — LOCKED, user-directed)
 - **Every exported ledger now carries the totals block + per-share P&L** — the locked CSV layout
   ("always include WIN $, LOSS $, NET $"). `scripts/run_book.py` gained `_write_ledger()`, which
