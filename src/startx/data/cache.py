@@ -89,13 +89,28 @@ class ParquetCache:
         path = self._path(key)
         df.to_parquet(path, index=False)
         # Record coverage metadata so a later wider-range request can detect that this
-        # cache is too narrow. Fall back to the frame's own time axis when the caller
-        # did not pass an explicit requested range.
+        # cache is too narrow.
+        #
+        # start: record the *requested* start as the covered floor. A provider's first
+        #   available bar is often a day or two after the requested start (e.g. asked for
+        #   2010-01-01, first bar 2010-01-04); recording the request avoids a pointless
+        #   re-fetch on every subsequent same-floor request. Fall back to the frame axis
+        #   when no request was given.
+        # end: record the *actual* last bar, clamped to the requested end. The tail is
+        #   where new data appears, so the metadata must reflect what the cache truly
+        #   holds — claiming coverage through a requested end the provider hasn't filled
+        #   yet would mask a missing fresh bar forever. We never record an end *beyond*
+        #   the requested window either (no false claim past what was asked for).
         span = _frame_span(df)
         if coverage_start is None and span is not None:
             coverage_start = span[0].isoformat()
-        if coverage_end is None and span is not None:
-            coverage_end = span[1].isoformat()
+        actual_end = span[1] if span is not None else None
+        if actual_end is not None:
+            if coverage_end is not None:
+                coverage_end = min(pd.Timestamp(coverage_end), actual_end).isoformat()
+            else:
+                coverage_end = actual_end.isoformat()
+        # else: empty/axis-less frame -> keep the requested coverage_end (or None).
         meta = {
             "saved_at": time.time(),
             "rows": int(len(df)),

@@ -52,8 +52,11 @@ def walk_forward_predict(
     ----------
     X, y, t1:
         Features, labels and label-end times. All share one time-ordered index.
-        ``t1`` is accepted for API consistency and embargo sizing; the embargo
-        gap is applied positionally between train end and test start.
+        ``t1`` is the *end* of each sample's label interval; the sample's *start*
+        is its own entry time. In addition to the positional embargo, every train
+        row whose label interval ``[entry, t1]`` overlaps the test block's interval
+        is **purged** so multi-bar labels (e.g. 63d/252d triple-barrier) cannot
+        bleed across the boundary.
     model_factory:
         Zero-arg callable returning a *fresh* sklearn-like estimator each fold
         (must implement ``fit`` and ``predict``; ``predict_proba`` optional).
@@ -83,6 +86,12 @@ def walk_forward_predict(
     if train_min < 1 or test_span < 1:
         raise ValueError("train_min and test_span must be >= 1")
 
+    # Label interval bounds for purging, positionally aligned to `index`.
+    # `starts` = each sample's entry time, `ends` = its label-end time (t1).
+    # Prefer real entry timestamps (the index, when it carries time) so multi-bar
+    # overlap is measured in time, not position; fall back to positions otherwise.
+    starts, ends = _label_bounds(index, t1, n)
+
     embargo = int(n * embargo_pct)
     X_arr = X.to_numpy() if isinstance(X, (pd.DataFrame, pd.Series)) else np.asarray(X)
     if X_arr.ndim == 1:
@@ -101,17 +110,29 @@ def walk_forward_predict(
         if train_end < 1:
             test_start = test_end
             continue
-        tr = slice(0, train_end)
+
+        # PURGE label-span overlap: drop train rows whose label interval
+        # [entry, t1] overlaps the test block's interval. This is what the
+        # positional embargo alone misses for multi-bar labels — the last ~span
+        # train labels otherwise close *inside* the test window and leak.
+        tr_pos = np.arange(0, train_end)
+        test_lo = starts[test_start:test_end].min()
+        test_hi = ends[test_start:test_end].max()
+        overlap = (starts[tr_pos] <= test_hi) & (ends[tr_pos] >= test_lo)
+        tr_pos = tr_pos[~overlap]
+        if tr_pos.size < 1:
+            test_start = test_end
+            continue
         te = slice(test_start, test_end)
 
-        y_tr = y_arr[tr]
+        y_tr = y_arr[tr_pos]
         # A classifier needs >= 2 classes; skip degenerate folds gracefully.
         if np.unique(y_tr[~_isnan(y_tr)]).size < 2:
             test_start = test_end
             continue
 
         model = model_factory()
-        model.fit(X_arr[tr], y_tr)
+        model.fit(X_arr[tr_pos], y_tr)
         preds = np.asarray(model.predict(X_arr[te])).ravel()
         if proba:
             scores = _predict_proba(model, X_arr[te])
@@ -131,6 +152,56 @@ def walk_forward_predict(
         index=index[rows_idx] if rows_idx else index[:0],
     )
     return out
+
+
+def _is_datetime_like(values: np.ndarray) -> bool:
+    """True if ``values`` is a datetime64 array (real timestamps)."""
+    return np.issubdtype(np.asarray(values).dtype, np.datetime64)
+
+
+def _label_bounds(
+    index: pd.Index, t1: pd.Series | None, n: int
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return positionally-aligned ``(starts, ends)`` label-interval bounds.
+
+    ``starts`` is each sample's entry time, ``ends`` its label-end time (t1),
+    both as comparable values aligned to row position. Overlap is measured in
+    *time* whenever real timestamps are available — either on the index (the
+    DatetimeIndex shape) or on ``t1``'s own values + entry index (the production
+    Dataset shape, where ``X``/``t1`` carry a RangeIndex but ``t1`` is indexed by
+    entry date). When no timestamps are available, or ``t1`` is unusable, every
+    label collapses to a single positional point so a single-bar label never
+    spuriously overlaps and the purge degrades to a no-op rather than misfiring.
+    NaN/NaT ``t1`` entries collapse to the sample's own start (conservative).
+    """
+    idx_vals = index.to_numpy()
+    t1_vals = (
+        t1.to_numpy() if isinstance(t1, pd.Series)
+        else (np.asarray(t1) if t1 is not None else None)
+    )
+    t1_index_vals = np.asarray(t1.index) if isinstance(t1, pd.Series) else None
+
+    # Case A — the index itself carries entry timestamps (DatetimeIndex shape).
+    if _is_datetime_like(idx_vals):
+        starts = idx_vals
+        if t1_vals is not None and len(t1_vals) == n and _is_datetime_like(t1_vals):
+            ends = pd.Series(t1_vals).fillna(pd.Series(starts)).to_numpy()
+            return starts, ends
+        return starts, starts.copy()
+
+    # Case B — positional index, but t1 carries time on its values AND its index
+    # (production Dataset: t1 reindexed by entry date). Overlap in real time.
+    if (
+        t1_vals is not None and len(t1_vals) == n and _is_datetime_like(t1_vals)
+        and t1_index_vals is not None and _is_datetime_like(t1_index_vals)
+    ):
+        starts = t1_index_vals
+        ends = pd.Series(t1_vals).fillna(pd.Series(starts)).to_numpy()
+        return starts, ends
+
+    # Case C — no usable timestamps anywhere: single-point positional labels.
+    pos = np.arange(n)
+    return pos, pos.copy()
 
 
 def _isnan(a: np.ndarray) -> np.ndarray:

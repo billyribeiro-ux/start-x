@@ -131,6 +131,29 @@ def test_forensic_features_exclude_outcome_and_level_columns():
     assert {"rvol_20", "atr_expansion", "gap_pct", "ar_z", "ibs_entry", "candle_doji"} <= feats
 
 
+def test_forensic_features_reject_numeric_nonbinary_candle_column():
+    """Allow-list guard (defect #3): a numeric ``candle_*`` column that is NOT a genuine 0/1
+    one-hot must be REJECTED — the ``candle_`` prefix is not a blank cheque.
+
+    Pre-fix, any numeric ``candle_*`` column passed, so a continuous ``candle_LEAKED_RETURN``
+    (or a price level wearing the prefix) leaked into the meta-model. Real one-hots — a known
+    archetype name OR strictly 0/1 values — must still be eligible.
+    """
+    df = pd.DataFrame({
+        "symbol": ["SPY", "SPY"], "entry_date": [pd.Timestamp("2025-01-01")] * 2,
+        "is_win": [1, 0], "ret_net": [0.01, -0.01],
+        "rvol_20": [1.2, 0.8],
+        "candle_doji": [1, 0],                        # known-archetype one-hot -> kept
+        "candle_custom_flag": [0, 1],                 # unknown name but strictly 0/1 -> kept
+        "candle_LEAKED_RETURN": [0.0734, -0.0512],    # continuous leak wearing the prefix -> reject
+        "candle_LEAKED_PRICE": [600.5, 590.2],        # price level wearing the prefix -> reject
+    })
+    feats = set(forensic_feature_columns(df))
+    assert not feats & {"candle_LEAKED_RETURN", "candle_LEAKED_PRICE"}, (
+        "a numeric, non-0/1 candle_* column leaked through the allow-list")
+    assert {"candle_doji", "candle_custom_flag", "rvol_20"} <= feats
+
+
 def test_win_loss_signature_ranks_separating_feature_first():
     """The feature that actually separates wins from losses must rank first by |AUC-0.5|."""
     autopsy = _synthetic_autopsy(400, edge=2.0, shuffle=False, seed=1)

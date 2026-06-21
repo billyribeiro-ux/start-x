@@ -104,6 +104,96 @@ def test_purged_kfold_requires_t1():
         PurgedKFold(n_splits=5, t1=None)
 
 
+def test_purged_kfold_production_shape_no_crash_and_purges():
+    """Regression: ``split`` must work on the PRODUCTION Dataset shape — a RangeIndex
+    ``X`` paired with ``t1`` as a plain Series of datetimes (indexed by entry date).
+
+    Previously ``split`` did ``starts = X.index.to_numpy()`` (ints) and compared them to
+    datetime ``ends`` -> ``UFuncTypeError``. Here we assert (1) no crash and (2) the firewall
+    still purges every train label whose interval overlaps the test block, in TIME.
+    """
+    n, span = 120, 6
+    entry = pd.date_range("2020-01-01", periods=n, freq="D")
+    end_pos = np.minimum(np.arange(n) + span, n - 1)
+    end_dates = entry[end_pos]
+
+    # X: bare RangeIndex (model feature matrix). t1: datetime values indexed by entry DATE.
+    X = pd.DataFrame({"f": np.arange(n, dtype=float)}, index=pd.RangeIndex(n))
+    t1 = pd.Series(end_dates.to_numpy(), index=pd.DatetimeIndex(entry, name="entry_date"))
+    assert X.index.dtype.kind == "i" and t1.dtype.kind == "M"  # the crashing combination
+
+    pkf = PurgedKFold(n_splits=5, t1=t1, embargo_pct=0.02)
+    starts = entry.to_numpy()  # entry timestamps by position
+    ends = end_dates.to_numpy()
+    n_folds = 0
+    for train_idx, test_idx in pkf.split(X):  # must NOT raise
+        n_folds += 1
+        assert len(np.intersect1d(train_idx, test_idx)) == 0
+        test_start = starts[test_idx].min()
+        test_end = ends[test_idx].max()
+        overlap = (starts[train_idx] <= test_end) & (ends[train_idx] >= test_start)
+        assert not overlap.any(), (
+            f"LEAKAGE on production shape: {overlap.sum()} train labels overlap the test block")
+    assert n_folds == 5
+
+
+def test_walk_forward_purges_label_span_overlap():
+    """Regression (defect #1): walk-forward must purge train rows whose label interval
+    ``[entry, t1]`` overlaps the test block — not only apply a positional embargo.
+
+    With ``span``-bar labels the last ~span train rows close INSIDE the test window. A spy
+    model records every training set it is fed; we assert none of those rows overlaps the
+    test block. Pre-fix this count was > 0 (the unpurged leak); post-fix it must be 0.
+    """
+    n, span = 300, 20
+    idx = pd.date_range("2019-01-01", periods=n, freq="D")
+    rng = np.random.default_rng(0)
+    f = rng.normal(size=n)
+    # Feature column 0 carries the row POSITION so we can map a trained row back to it.
+    X = pd.DataFrame({"pos": np.arange(n, dtype=float)}, index=idx)
+    y = pd.Series(np.tile([0, 1], n // 2)[:n], index=idx)
+    end_pos = np.minimum(np.arange(n) + span, n - 1)
+    t1 = pd.Series(idx[end_pos], index=idx)
+    starts, ends = idx.to_numpy(), t1.to_numpy()
+
+    seen: list[np.ndarray] = []
+
+    class _Spy:
+        def fit(self, Xa, ya):
+            seen.append(np.asarray(Xa)[:, 0].astype(int).copy())
+            return self
+
+        def predict(self, Xa):
+            return np.zeros(len(Xa), dtype=int)
+
+        def predict_proba(self, Xa):
+            return np.column_stack([np.ones(len(Xa)), np.zeros(len(Xa))])
+
+        classes_ = np.array([0, 1])
+
+    train_min, test_span = 100, 40
+    out = walk_forward_predict(
+        X, y, t1, lambda: _Spy(),
+        train_min=train_min, test_span=test_span, embargo_pct=0.0,
+    )
+    assert not out.empty and seen, "the harness must have trained at least one fold"
+
+    # For each fold, no trained row's label interval may overlap that fold's test block.
+    total_overlap = 0
+    test_start, fold = train_min, 0
+    while test_start < n and fold < len(seen):
+        test_end = min(test_start + test_span, n)
+        te = np.arange(test_start, test_end)
+        trained = seen[fold]
+        t_lo, t_hi = starts[te].min(), ends[te].max()
+        ov = (starts[trained] <= t_hi) & (ends[trained] >= t_lo)
+        total_overlap += int(ov.sum())
+        fold += 1
+        test_start = test_end
+    assert total_overlap == 0, (
+        f"LEAKAGE: {total_overlap} trained rows' label spans overlap their test block")
+
+
 # --------------------------------------------------------------------------- #
 # 2. CPCV — combination count and path count
 # --------------------------------------------------------------------------- #

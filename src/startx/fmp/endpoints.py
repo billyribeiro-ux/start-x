@@ -52,12 +52,43 @@ def profile(client: FMPClient, symbol: str) -> dict:
 
 
 # -- company catalysts ------------------------------------------------------
+#: Wall-clock time stamped onto an earnings report whose session ("when": bmo/amc) is unknown
+#: or after-close. One second past the 16:00 cash close is deliberately *post-close*, so the
+#: point-in-time gate in ``events.attribute`` advances it to the NEXT trading day (t+1) rather
+#: than crediting the report to day t's move. This is the conservative PIT choice: most US
+#: single-stock earnings are released after the close (AMC), and the FMP stable ``earnings``
+#: feed carries no intraday time, so absent an explicit "bmo" we must assume after-close.
+_AMC_STAMP = "16:00:01"
+
+
 def earnings(client: FMPClient, symbol: str, limit: int = 80) -> pd.DataFrame:
-    return _safe(
-        lambda: _to_df(
-            client.get("earnings", symbol=symbol, limit=limit), {"date": "ts"}
+    """Earnings history with a point-in-time ``ts``.
+
+    The FMP stable ``earnings`` endpoint returns only a ``date`` (no BMO/AMC time). If a future
+    feed revision carries a ``time``/``when`` field, a "bmo"/"before"/"premarket" value keeps the
+    report on its report date (it was public before that day's open); anything else — and the
+    common no-time case — is placed one second after the cash close so it attributes to t+1.
+    """
+    def _fetch() -> pd.DataFrame:
+        df = _to_df(client.get("earnings", symbol=symbol, limit=limit))
+        if df.empty or "date" not in df.columns:
+            df["ts"] = pd.NaT if not df.empty else df.get("ts")
+            return df
+        date = pd.to_datetime(df["date"], errors="coerce")
+        # Default every report to the post-close (AMC) boundary so it lands on t+1 unless we have
+        # explicit evidence it was released before the open.
+        stamp = pd.Series(_AMC_STAMP, index=df.index)
+        when_col = next((c for c in ("time", "when", "session") if c in df.columns), None)
+        if when_col is not None:
+            w = df[when_col].astype(str).str.lower()
+            is_bmo = w.str.contains("bmo|before|pre|morning|am", regex=True, na=False)
+            stamp = stamp.mask(is_bmo, "00:00:00")  # before the open -> stays on the report date
+        df["ts"] = pd.to_datetime(
+            date.dt.strftime("%Y-%m-%d") + " " + stamp, errors="coerce"
         )
-    )
+        return df
+
+    return _safe(_fetch)
 
 
 def analyst_grades(client: FMPClient, symbol: str, limit: int = 1000) -> pd.DataFrame:

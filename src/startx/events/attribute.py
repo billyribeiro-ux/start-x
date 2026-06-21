@@ -8,17 +8,46 @@ confidence, while a catalyst pointing the wrong way is discounted.
 """
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import time, timedelta
 from typing import Any
 
 import numpy as np
 import pandas as pd
 
+#: Cash-session close used for the point-in-time gate. A catalyst whose timestamp falls at or
+#: before this wall-clock time on its calendar day was public *before* that day's close and may
+#: be attributed to that day's move; a later timestamp (post-close news, analyst actions, AMC
+#: earnings) is shifted to the NEXT trading day — it could not have moved the session it follows.
+SESSION_CLOSE = time(16, 0)  # 16:00, the timestamps' own clock (FMP company/news feed convention)
+
+
+def _effective_ts(raw: pd.Series) -> pd.Series:
+    """Map each catalyst timestamp to the move-day it could legitimately explain (PIT gate).
+
+    Timestamps at/before the session close keep their own calendar day. Timestamps after the
+    close (or date-only midnight stamps that we have deliberately pushed past the close, e.g.
+    AMC earnings stamped at 16:00:01) are advanced to the NEXT trading day, so a post-close
+    catalyst can only be credited to t+1 — never to the move it chronologically trails.
+    """
+    ts = pd.to_datetime(raw, errors="coerce")
+    after_close = ts.dt.time > SESSION_CLOSE
+    shifted = ts.copy()
+    # Advance post-close stamps to 00:00 of the next *trading* day (skip Sat/Sun).
+    nxt = (ts[after_close].dt.normalize() + pd.offsets.BDay(1))
+    shifted.loc[after_close] = nxt
+    return shifted
+
 
 def _window(df: pd.DataFrame | None, start, end, ts_col: str = "ts") -> pd.DataFrame:
+    """Rows whose POST-CLOSE-GATED timestamp falls in ``[start, end)`` (the causal window).
+
+    The gate (``_effective_ts``) is applied before the window test, so a catalyst time-stamped
+    after the move's own close is evaluated as if it landed on the next trading day and therefore
+    cannot be attributed to the current move.
+    """
     if df is None or df.empty or ts_col not in df.columns:
         return pd.DataFrame()
-    t = df[ts_col]
+    t = _effective_ts(df[ts_col])
     return df[(t >= start) & (t < end)]
 
 
@@ -141,8 +170,11 @@ def attribute_event(
     """Return (ranked causes, top cause, confidence in [0,1]) for one event."""
     direction = event_row["direction"]
     ev_date = pd.Timestamp(event_row["date"]).normalize()
-    start = ev_date - timedelta(days=lookback_days)
-    end = ev_date + timedelta(days=1)  # include all of the event day
+    # Lookback is in trailing TRADING days, not calendar days, so a Friday catalyst can still be
+    # attributed to the following Monday's move (3 calendar days but 1 trading day back). Using
+    # calendar days would silently drop weekend-straddling causes.
+    start = ev_date - pd.offsets.BDay(lookback_days)
+    end = ev_date + timedelta(days=1)  # include all of the event day (up to its close, via the gate)
 
     builders = [
         (_earnings, "earnings"), (_grades, "grades"), (_price_target, "price_target"),

@@ -40,6 +40,59 @@ def _as_t1(t1: pd.Series, index: pd.Index) -> pd.Series:
     return t1.fillna(start)
 
 
+def _is_datetime_like(values: np.ndarray) -> bool:
+    """True if ``values`` is a datetime64 array (real timestamps)."""
+    return np.issubdtype(np.asarray(values).dtype, np.datetime64)
+
+
+def label_start_end(t1: pd.Series, index: pd.Index) -> tuple[np.ndarray, np.ndarray]:
+    """Return positionally-aligned ``(starts, ends)`` label-interval bounds.
+
+    ``starts`` is each sample's entry time and ``ends`` its label-end time, as a
+    **type-consistent, comparable** pair — the firewall's overlap test
+    ``start <= test_end and t1 >= test_start`` is only meaningful when both sides
+    share a dtype. Two production shapes are supported:
+
+    * **DatetimeIndex shape** — ``index`` carries entry timestamps and ``t1``'s
+      *values* are end timestamps (the legacy/portfolio path). Both bounds are
+      timestamps.
+    * **RangeIndex Dataset shape** — ``X``/``t1`` carry a RangeIndex but ``t1``
+      is indexed by entry date and its values are end dates (the model path).
+      Both bounds are taken from ``t1`` (its index = starts, its values = ends),
+      so neither side is the meaningless RangeIndex.
+
+    The previous implementation took ``starts = index.to_numpy()`` unconditionally
+    and compared int positions against datetime ``ends`` -> ``UFuncTypeError``.
+    """
+    idx_vals = index.to_numpy()
+    t1_vals = t1.to_numpy() if isinstance(t1, pd.Series) else np.asarray(t1)
+    t1_index_vals = np.asarray(t1.index) if isinstance(t1, pd.Series) else None
+
+    # DatetimeIndex shape: starts come from the index, ends from t1's values.
+    if _is_datetime_like(idx_vals):
+        aligned = _as_t1(t1, index)
+        return idx_vals, aligned.to_numpy()
+
+    # RangeIndex Dataset shape: t1 is indexed by entry date -> use t1 for both.
+    if (
+        t1_index_vals is not None and _is_datetime_like(t1_index_vals)
+        and _is_datetime_like(t1_vals)
+    ):
+        starts = t1_index_vals
+        ends = pd.Series(t1_vals).fillna(pd.Series(starts)).to_numpy()
+        return starts, ends
+
+    # Fallback: positions for starts, ends aligned to index (already comparable
+    # if both are positional/numeric). Keeps single-bar labels as points.
+    aligned = _as_t1(t1, index)
+    ends = aligned.to_numpy()
+    if _is_datetime_like(ends):
+        # No usable entry timestamps anywhere -> collapse to single positional points.
+        pos = np.arange(len(index))
+        return pos, pos.copy()
+    return idx_vals, ends
+
+
 def purge_embargo_train(
     train_idx: np.ndarray,
     test_positions: np.ndarray,
@@ -130,9 +183,10 @@ class PurgedKFold:
         if n != len(self.t1):
             raise ValueError("X and t1 must have the same length / index")
 
-        t1 = _as_t1(self.t1, index)
-        starts = index.to_numpy()
-        ends = t1.to_numpy()
+        # Type-consistent label bounds (robust to the RangeIndex Dataset shape,
+        # where index positions are ints but t1 carries datetimes -> the old
+        # ``starts = index.to_numpy()`` raised UFuncTypeError on the overlap test).
+        starts, ends = label_start_end(self.t1, index)
         embargo = int(n * self.embargo_pct)
 
         positions = np.arange(n)

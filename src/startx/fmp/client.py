@@ -25,6 +25,13 @@ class FMPError(RuntimeError):
     """Raised for API-level errors (bad key, plan limits, malformed responses)."""
 
 
+class FMPRateLimited(Exception):
+    """Internal: a 429 from FMP. Raised inside ``_send`` so the retry decorator can
+    back off and retry, instead of surfacing immediately. Bounded by ``stop_after_attempt``
+    — once retries are exhausted it is converted to a user-facing ``FMPError``.
+    """
+
+
 class _RateLimiter:
     """Sliding-window limiter: at most ``max_per_min`` calls in any 60s window."""
 
@@ -43,7 +50,9 @@ class _RateLimiter:
         self._calls.append(time.monotonic())
 
 
-_RETRYABLE = (httpx.TransportError, httpx.RemoteProtocolError)
+# 429 is retryable (transient rate-limit) via FMPRateLimited; the others are transport
+# faults. All retries are bounded by stop_after_attempt below — no infinite loop.
+_RETRYABLE = (httpx.TransportError, httpx.RemoteProtocolError, FMPRateLimited)
 
 
 class FMPClient:
@@ -76,20 +85,31 @@ class FMPClient:
     )
     def _send(self, path: str, params: dict[str, Any]) -> httpx.Response:
         self._rl.acquire()
-        return self._client.get("/" + path.lstrip("/"), params=params)
+        resp = self._client.get("/" + path.lstrip("/"), params=params)
+        # Raise inside the retry boundary so a transient 429 backs off and retries
+        # (bounded by stop_after_attempt) instead of immediately raising FMPError and
+        # being swallowed into an empty frame by the catalyst `_safe` wrapper.
+        if resp.status_code == 429:
+            raise FMPRateLimited(f"429 Rate limited for {path}")
+        return resp
 
     def get(self, path: str, **params: Any) -> Any:
         """GET ``path`` with query ``params`` (apikey injected). Returns parsed JSON."""
         params = {k: v for k, v in params.items() if v is not None}
         params["apikey"] = self._key
-        resp = self._send(path, params)
+        try:
+            resp = self._send(path, params)
+        except FMPRateLimited as exc:
+            # Bounded retries (see _send / stop_after_attempt) are exhausted: surface as
+            # a user-facing FMPError, preserving the original 429 behaviour.
+            raise FMPError(
+                "429 Rate limited — retries exhausted; lower RATE_LIMIT_PER_MIN."
+            ) from exc
 
         if resp.status_code == 401:
             raise FMPError("401 Unauthorized — check FMP_API_KEY.")
         if resp.status_code == 403:
             raise FMPError(f"403 Forbidden — endpoint not in your plan: {path}")
-        if resp.status_code == 429:
-            raise FMPError("429 Rate limited — lower RATE_LIMIT_PER_MIN.")
         if resp.status_code >= 400:
             raise FMPError(f"HTTP {resp.status_code} for {path}: {resp.text[:200]}")
 

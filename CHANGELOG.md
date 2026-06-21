@@ -39,9 +39,35 @@ attribution engine, and (c) the abandoned `prob_up` ML pipeline — none touch t
 - **Ensemble max-Sharpe ridge made scale-aware** (`1e-10` → `1e-6·trace(cov)/n`) so the tangency
   solve doesn't explode on near-collinear edges under `long_only=False` (default long-only unchanged).
 
-_Remaining forensic fixes — cache-coverage wiring (HIGH), attribution intraday-leakage gate (HIGH),
-and validation purge/PurgedKFold/allow-list hardening — are landing via the fix fleet and committed
-as each is verified._
+### Fixed (forensic re-audit — data layer)
+- **Cache-coverage check wired into `get_prices` (HIGH).** The coverage/TTL logic in `cache.py` was
+  DEAD CODE — `get_prices` never passed the coverage args, so a truncated/stale price cache was
+  served verbatim regardless of the requested history. Now passes `coverage_start=history_start` +
+  `coverage_end=<last expected TRADING day>` so a wider/stale request re-fetches; the trading-day
+  comparison (not raw `today`) means a weekend/holiday run against an up-to-date cache does NOT
+  falsely re-fetch. HTTP 429 added to the client's retryable set with bounded backoff (was swallowed
+  into an empty frame). Tests added (`test_prices.py`, `test_client.py`; `test_cache.py` extended).
+
+### Fixed (forensic re-audit — validation hardening; ML/research pipeline, not the books)
+- **`walk_forward_predict` now PURGES label-span overlap** (not just a positional embargo) — train
+  labels whose `[entry,t1]` reaches into the test block are dropped (the LdP purge the long/position
+  label horizons needed).
+- **`PurgedKFold` no longer crashes on the production `Dataset` shape.** It treated `X.index` (a
+  RangeIndex from `dataset.py`) as datetime label-starts → `Int64 vs DateTime64` error, killing the
+  Optuna OOS-AUC tuner; now derives starts from `t1`'s values. Regression test on the RangeIndex shape.
+- **Feature allow-list closed the `candle_` hole.** A numeric `candle_*` column could pass blindly;
+  now trusted only if a known candle archetype OR genuinely 0/1-valued. Probe test added.
+
+### Fixed (forensic re-audit — causal-attribution engine; HIGH leakage)
+- **Same-day POST-CLOSE catalysts no longer attributed to the move (HIGH).** `attribute.py` used a
+  day-resolution window that credited post-16:00 news / analyst actions / AMC earnings to that day's
+  move (fabricated causality — e.g. a post-close beat inflated confidence 0.0→0.70). A `SESSION_CLOSE`
+  (16:00) gate now keeps at/before-close catalysts on their day and advances post-close ones to the
+  NEXT trading day. Earnings with no intraday time default to AMC (`16:00:01` → t+1), the conservative
+  PIT choice.
+- **Evidence-Miner made truthful** — its catalyst flags respect the same post-close gate, so the page's
+  "prior-day (t-1) snapshot" claim holds; lookback converted from calendar to trailing TRADING days (a
+  Friday catalyst → Monday move is no longer dropped). Same-day-post-close test added.
 
 ### Fixed (the three flagged known-limitations — "get everything fixed")
 - **`days_to_next_earnings` PIT leak closed.** `features/flow.py` counted days to the next future

@@ -8,8 +8,10 @@ POINT-IN-TIME RULE (the whole point of this file): a move happens on day ``t``. 
 that preceded it are the feature row at the *prior* trading day ``t-1`` — information available
 *before* the move. We merge each move to the feature matrix shifted by one trading day, so day
 ``t``'s own features can never be used to "explain" day ``t``'s move. Catalysts are attributed
-only from inside the causal lookback window ``[t - lookback, t]`` (handled by
-``attribute_event``), which is also strictly pre/at-move.
+only from inside the causal lookback window ``[t - lookback trading days, t's close]`` (handled by
+``attribute_event``): a catalyst time-stamped *after* day ``t``'s cash close (post-close news,
+analyst actions, AMC earnings) is gated out and pushed to ``t+1``, so the catalyst flags are also
+strictly information available at or before ``t``'s close.
 
 Ranking quantifies, for each numeric feature, how strongly its level at ``t-1`` separates
 up-moves from down-moves (point-biserial correlation, single-feature AUC, mean lift), so the
@@ -179,7 +181,12 @@ def _prior_day_snapshot(matrix: pd.DataFrame) -> pd.DataFrame:
 def _attach_catalysts(
     moves: pd.DataFrame, catalysts: dict[str, pd.DataFrame], lookback_days: int
 ) -> pd.DataFrame:
-    """Add ``cat_<type>`` presence flags + a ``top_catalyst`` label per move (PIT-attributed)."""
+    """Add ``cat_<type>`` presence flags + a ``top_catalyst`` label per move (PIT-attributed).
+
+    Attribution runs through ``attribute_event``, which gates out any catalyst stamped after the
+    move-day's close (advancing it to ``t+1``), so every flag here reflects only information public
+    at or before day ``t``'s close — never a post-close catalyst leaked back onto the move.
+    """
     flags: list[dict[str, int]] = []
     tops: list[str] = []
     for _, row in moves.iterrows():

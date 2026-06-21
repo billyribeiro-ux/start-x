@@ -203,13 +203,20 @@ def _assemble(
     if len(w) and w.sum() > 0:
         w = w * (len(w) / w.sum())
 
-    # Share a clean RangeIndex across all members.
+    # Share a clean RangeIndex across X/y/w/meta (the model feature matrix shape).
     rng = pd.RangeIndex(len(X))
     X.index = rng
     y.index = rng
-    t1.index = rng
     w.index = rng
     meta.index = rng
+
+    # t1 is the ONE member that carries a label INTERVAL: index it by the sample's
+    # ENTRY date (start) with values = label END date. This makes the (start, end)
+    # interval self-describing so the purged-CV / walk-forward firewall can measure
+    # label-span overlap in TIME on the production shape — without it, t1 had a bare
+    # RangeIndex and the firewall compared int positions to datetime ends
+    # (UFuncTypeError). Length stays n, so Dataset's length invariant holds.
+    t1.index = pd.DatetimeIndex(pd.to_datetime(sub["date"].to_numpy()), name="entry_date")
 
     meta.attrs["nan_strategy"] = nan_strategy
     meta.attrs["pooled"] = pooled

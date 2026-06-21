@@ -174,6 +174,59 @@ def test_no_date_column_warns_and_serves(tmp_path):
     assert any(issubclass(w.category, RuntimeWarning) for w in caught)
 
 
+# --- coverage_end records the ACTUAL tail, not an over-claimed request ------
+
+def test_coverage_end_clamped_to_actual_data(tmp_path):
+    """If the provider returns fewer bars than the requested end (e.g. asked through
+    Friday, only Thursday is published yet), the metadata must record the *actual* last
+    bar — not the requested end — so a later request re-fetches once the new bar lands.
+    Otherwise the missing fresh bar is masked forever."""
+    cache = ParquetCache(tmp_path)
+    calls = []
+
+    def fetch_thru_thu():
+        calls.append("thu")
+        return _frame(["2026-06-18", "2026-06-19"], [1.0, 2.0])  # Thu/Fri... actually
+
+    def fetch_thru_fri():
+        calls.append("fri")
+        return _frame(["2026-06-18", "2026-06-19", "2026-06-22"], [1.0, 2.0, 3.0])
+
+    # Requested coverage_end is past the last actual bar (2026-06-19).
+    cache.get_or_fetch(
+        "prices/SPY", fetch_thru_thu,
+        coverage_start="2019-01-01", coverage_end="2026-06-22",
+    )
+    # A later request whose end matches the now-available newer bar must re-fetch,
+    # because the recorded coverage_end was clamped to the actual tail (2026-06-19),
+    # not the over-claimed 2026-06-22.
+    cache.get_or_fetch(
+        "prices/SPY", fetch_thru_fri,
+        coverage_start="2019-01-01", coverage_end="2026-06-22",
+    )
+    assert calls == ["thu", "fri"]
+
+
+def test_coverage_end_request_equal_to_tail_is_cache_hit(tmp_path):
+    """When the requested end equals the cached tail, it's a hit (no spurious re-fetch)."""
+    cache = ParquetCache(tmp_path)
+    calls = []
+
+    def fetch():
+        calls.append(1)
+        return _frame(["2019-01-02", "2026-06-19"], [1.0, 2.0])
+
+    cache.get_or_fetch(
+        "prices/SPY", fetch,
+        coverage_start="2019-01-01", coverage_end="2026-06-19",
+    )
+    cache.get_or_fetch(
+        "prices/SPY", fetch,
+        coverage_start="2019-01-01", coverage_end="2026-06-19",
+    )
+    assert calls == [1]
+
+
 # --- TTL --------------------------------------------------------------------
 
 def test_max_age_expiry_refetches(tmp_path):

@@ -55,8 +55,10 @@ start = c1.date_input("Start", value=date(2021, 1, 1))
 end = c2.date_input("End", value=date(2024, 12, 31))
 ar_threshold = st.sidebar.slider("Significance (|abnormal-return z|)", 1.5, 5.0, 2.5, 0.1)
 st.sidebar.info(
-    "Strict point-in-time: every condition is the feature snapshot from the PRIOR trading day "
-    "(t-1), so day-t's own move never explains itself. Ranking shows single-feature AUC "
+    "Strict point-in-time: numeric feature conditions are the snapshot from the PRIOR trading day "
+    "(t-1), so day-t's own move never explains itself. Catalyst flags (cat_*) come from the causal "
+    "lookback window up to day-t's CLOSE — any catalyst stamped after the close (post-close news, "
+    "AMC earnings) is gated out and credited to t+1, never to t. Ranking shows single-feature AUC "
     "(0.5 = no signal) and lift — 'what matched the most'.")
 
 # -- main ------------------------------------------------------------------
