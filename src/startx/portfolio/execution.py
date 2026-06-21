@@ -8,15 +8,24 @@ each sleeve so we know which edges survive contact with the order book.
 
 The cross-desk finding this reproduces
 -------------------------------------
-Drift-adjusted **alpha** = per-trade expectancy − the same-holding-period buy-and-hold drift (a
-part-time long silently collects the bull; subtract it to see the real edge). Under realistic fills:
+Drift-adjusted **alpha** = per-trade net return − the same-holding-period buy-and-hold drift (a
+part-time long silently collects the bull; subtract it to see the real edge). Two orthogonal axes:
 
-* **breakout** and **vrp** are *fill-insensitive on alpha* — their edge barely moves close ->
-  next-open -> vwap, and the break-even cost that zeroes their drift-adjusted alpha is large. Trust.
-* **ibs** and the **fear sleeves** (vrp's cousin vvix, vix-capitulation) *lose their alpha on
-  next-open* — they front-run a gap that you do not actually capture if you fill at the next open or
-  VWAP. Their alpha break-even is only **~0-6 bps/side** -> **beta-robust, alpha-fragile**: durable
-  risk premia, not alpha. Size them small.
+* *fill-insensitivity* — how little the alpha moves close -> next-open -> vwap (the
+  ``alpha_next_open_drop``). **breakout** and **vrp** drop the least: their edge does not live in a
+  next-bar gap, so a delayed fill barely touches it.
+* *alpha break-even* — the per-side cost that zeroes the close-fill alpha. **breakout** is the only
+  sleeve with a real buffer (~9 bps/side) -> durable, cost-robust **alpha**. Trust it most.
+
+The honest verdict the report makes plain:
+
+* **breakout** = real, durable, fill-robust drift-adjusted alpha (~+0.17%/trade, survives next-open,
+  ~9 bp break-even).
+* **ibs** and the **fear sleeves** (**vrp**, **vvix**, vix-capitulation) = **beta-robust,
+  alpha-fragile**. Their *raw* return is healthy (they are durable volatility **risk premia**) but
+  their *excess over passively holding the index* is thin-to-negative and their alpha break-even is
+  only **~0-2 bps/side** — a single bp of slippage or a next-open fill erases it. They earn their
+  place by **diversifying** the book, sized small, NOT as standalone alpha.
 
 Convention
 ----------
@@ -229,7 +238,6 @@ def apply_fills(trades: pd.DataFrame, prices: pd.DataFrame, *, entry: str = "clo
     p = _indexed(prices)
     atr_pct = _atr_pct_by_date(prices)
     sides = _side_series(out)
-    slip = float(slippage_bps) / _BPS
 
     rows = []
     dropped = 0
@@ -239,43 +247,48 @@ def apply_fills(trades: pd.DataFrame, prices: pd.DataFrame, *, entry: str = "clo
         if ed not in p.index or xd not in p.index:
             dropped += 1
             continue
+        ideal_entry = float(t["entry_price"])
+        ideal_exit = float(t["exit_price"])
         e_loc = int(p.index.get_loc(ed))
+        x_loc = int(p.index.get_loc(xd))
+
         # --- entry leg --------------------------------------------------------------------------
+        # `close` preserves the strategy's own signal-bar entry price (the idealized fill); the
+        # `next_*` modes substitute the *next* bar's open/vwap (the first price you could trade).
         if entry == "close":
-            e_fill_date = p.index[e_loc]
+            e_base, e_fill_date = ideal_entry, p.index[e_loc]
         else:
             if e_loc + 1 >= len(p):
                 dropped += 1
                 continue
+            nxt = p.iloc[e_loc + 1]
+            e_base = _bar_price(nxt, "open" if entry == "next_open" else "vwap")
             e_fill_date = p.index[e_loc + 1]
         e_atr = float(atr_pct.get(ed, np.nan))
         e_vol = float(p.iloc[e_loc].get("volume", np.nan))
-        e_impact = _impact_bps(impact_model, atr_pct=e_atr, volume=e_vol)
-        e_cost_bps = float(slippage_bps) + e_impact
-        e_price = realistic_fill_price(prices, ed, int(side), entry, slippage_bps=0.0)
-        e_price *= (1.0 + side * e_cost_bps / _BPS)  # slippage + impact, adverse to the order
+        e_cost_bps = float(slippage_bps) + _impact_bps(impact_model, atr_pct=e_atr, volume=e_vol)
+        e_price = e_base * (1.0 + side * e_cost_bps / _BPS)  # buy pays up / short receives less
 
         # --- exit leg ---------------------------------------------------------------------------
-        # Exit closes the position, so its order side is the opposite of the entry.
-        x_loc = int(p.index.get_loc(xd))
+        # `close` preserves the strategy's own *managed* exit (chandelier/target/stop level); the
+        # `next_*` modes assume you could not hit that level and instead exit on the next bar. The
+        # exit order is the opposite side of the entry, so slippage is again adverse.
         if exit == "close":
-            x_fill_date = p.index[x_loc]
+            x_base, x_fill_date = ideal_exit, p.index[x_loc]
         else:
             if x_loc + 1 >= len(p):
                 dropped += 1
                 continue
+            nxt = p.iloc[x_loc + 1]
+            x_base = _bar_price(nxt, "open" if exit == "next_open" else "vwap")
             x_fill_date = p.index[x_loc + 1]
         x_atr = float(atr_pct.get(xd, np.nan))
         x_vol = float(p.iloc[x_loc].get("volume", np.nan))
-        x_impact = _impact_bps(impact_model, atr_pct=x_atr, volume=x_vol)
-        x_cost_bps = float(slippage_bps) + x_impact
-        x_price = realistic_fill_price(prices, xd, int(-side), exit, slippage_bps=0.0)
-        x_price *= (1.0 - side * x_cost_bps / _BPS)  # exit is the opposite side -> adverse again
+        x_cost_bps = float(slippage_bps) + _impact_bps(impact_model, atr_pct=x_atr, volume=x_vol)
+        x_price = x_base * (1.0 - side * x_cost_bps / _BPS)  # exit is opposite side -> adverse
 
-        gross = side * (x_price / e_price - 1.0)
-        # Net of both legs' costs already baked into the fills; report the round-trip drag too.
-        ret_net = gross
-        ret_gross_ideal = side * (float(t["exit_price"]) / float(t["entry_price"]) - 1.0)
+        ret_net = side * (x_price / e_price - 1.0)
+        ret_gross_ideal = side * (ideal_exit / ideal_entry - 1.0)
 
         rec = t.to_dict()
         rec.update(

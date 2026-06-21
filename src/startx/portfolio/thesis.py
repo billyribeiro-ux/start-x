@@ -38,7 +38,7 @@ from __future__ import annotations
 import warnings
 from dataclasses import dataclass, field
 from datetime import timedelta
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping
 
 import numpy as np
 import pandas as pd
@@ -255,11 +255,18 @@ class _RegimeModel:
     @staticmethod
     def _classify(st: RegimeState) -> str:
         r = st.vix_ratio
+        # Vol-of-vol and the term structure can flag stress that spot VIX hasn't caught up to yet
+        # (e.g. an intraday panic where VVIX is pinned but VIX closed off its high). An extreme VVIX
+        # with an inverted term floors the read at "fear" so we never call a p100-VVIX tape "calm".
+        vvix_extreme = np.isfinite(st.vvix_pct) and st.vvix_pct >= _VVIX_HOT
+        term_inverted = np.isfinite(st.term_slope) and st.term_slope < 1.0
         if np.isfinite(r):
             if r >= _VIX_STRESS_RATIO:
                 return "stress"
             if r >= _VIX_FEAR_RATIO:
                 return "fear"
+            if vvix_extreme and term_inverted:
+                return "fear"   # backwardated vol curve + extreme vol-of-vol = real stress
             if r <= 0.95:
                 return "calm"
             return "neutral"
@@ -706,10 +713,25 @@ def summarize_book(ledger: pd.DataFrame) -> str:
         + (f" (avg {avg_conv:.1f}/3)" if np.isfinite(avg_conv) else "")
     )
 
+    lead_fam = max(fam_counts, key=fam_counts.get) if fam_counts else "unknown"
+    posture = {
+        "breakout": (
+            "Net posture: the trend sleeve carries the weight where the regime confirms it, "
+            "with the fear sleeves kept small as diversifiers."
+        ),
+        "fear": (
+            "Net posture: harvesting the fear premium, each fear sleeve sized small, with the "
+            "trend sleeve standing by for when the tape calms."
+        ),
+        "ibs": (
+            "Net posture: timing exposure with dip-buys rather than a core directional bet, "
+            "fear sleeves kept small."
+        ),
+    }.get(lead_fam, "Net posture: size kept balanced across sleeves, fear sleeves small.")
+
     return (
         f"The book is running {n} position(s) — {mix} — {regime_gloss}; {conv_clause}. "
-        f"Net posture: the desk is {regime_gloss}, sizing the fear sleeves small and letting the "
-        f"trend sleeve carry the weight where the regime confirms it.{perf}"
+        f"{posture}{perf}"
     )
 
 
