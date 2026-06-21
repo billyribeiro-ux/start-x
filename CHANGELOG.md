@@ -21,6 +21,14 @@ Evidence lives in `FINDINGS.md`; the locked study window is **Jan 2019 → Jun 2
   other references are the module's own research `backtest()`, a `validate.py` scorecard, and a
   `thesis.py` import of the *separate* `adaptive_neutral`. So **System #1/#2 locked numbers are
   unchanged** — this is a research-module correctness fix, not a locked-system change.
+- **Evidence the fix mattered + `min_closes=3` confirmed best.** Empirical sweep of the CORRECTED
+  signal: on the deep ^GSPC 1990-2026 sample, `min_closes=2` is a LOSER (37 trades, PF 0.90, −0.13%
+  exp) while `min_closes=3` is a winner (7 trades, 71% win, +2.9% exp, PF 6.01) and `=4` is too rare
+  (1 trade). Because the old counter fired `min_closes=3` on the 2nd close, the buggy default had been
+  behaving like the *losing* 2-close trigger — the fix moves the default from a deep-history loser to a
+  genuine winner. Default stays **3** (evidence-best = documented thesis). Still thin (7 trades/36yr →
+  "rare, high-conviction", not bankable alone), so the prior demotion-for-thin-sample stands; it is no
+  longer "noise from a bug", though.
 
 ### Audit sweep — 6 parallel Opus agents (verify-with-evidence, then fix only what's real)
 An external code audit was run claim-by-claim; each was reproduced before any fix, and false alarms
