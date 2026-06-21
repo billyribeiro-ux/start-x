@@ -28,7 +28,14 @@ The remaining "rests on assumptions" items are now hard out-of-sample numbers:
   long-SPY-ish); you're better off holding the single best book. The in-sample lift was a weight-
   fitting mirage. (Distinct from the DECODE.md book+ML-ranker ensemble, whose value rests on the
   ~0-correlation ML sleeve — not re-tested here.)
-- _Walk-forward PARAMETER selection (5th agent) lands next — committed when verified._
+- **Walk-forward PARAMETER selection (in-sample-params gap).** `validation/wf_params.py` +
+  `scripts/walkforward_params.py` re-fit each book's grid on a rolling TRAIN window, apply the pick
+  forward, and report OOS deflated Sharpe penalized for the grid size. **long_swing SURVIVES** (OOS
+  Sharpe 0.99 ≥ in-sample 0.90; locks to the production hold=63 / chand=3.0). **position barely
+  moves** (0.84 vs 0.86 — nothing to overfit; the trend breakdown is the stop, not a tuned target).
+  **short_swing is too SPARSE to validate cleanly** — only 27-56 trades over 7yr, so a test block
+  often holds 0-3 trades and OOS Sharpe swings with the window (rolling 0.35 vs anchored 1.08); the
+  instability IS the verdict — the dip edge is real but too thin for rigorous WF param selection.
 
 ### Built — System #3: position book (`strategy/trend_position.py`)
 - **The third book is live: a 200-SMA ±3% hysteresis-band trend core**, long-above / flat-below, its
