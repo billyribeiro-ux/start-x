@@ -41,6 +41,20 @@ SPY book (1.18) **+ ML ranker (0.87, β≈0) → ceiling ~1.45**; + the orthogon
 index, macro) nudges toward ~1.5. Realistic decoded-system target: **a ~1.45–1.55 Sharpe diversified
 ensemble** — world-class *because* it's a portfolio of real edges, not a fragile single signal.
 
+### 🏁 ASSEMBLED — the decoded system (real streams, monthly, max-Sharpe; `portfolio/ensemble.py`)
+| Edge | Sharpe | weight | corr to book |
+|---|---|---|---|
+| SPY swing book | 1.12 | 72% | 1.00 |
+| ML ranker (market-neutral) | 0.90 | 26% | 0.09 |
+| Reaction-PEAD | 0.44 | 2% | 0.23 |
+
+**Ensemble: Sharpe 1.38 · deflated Sharpe 0.61 · CAGR +12.9% · maxDD −8.7% · Calmar 1.49** (89 months).
+vs SPY buy-and-hold (0.85 / +15.8% / −34.1% / 0.46): ~the index's return at a quarter of the
+drawdown, 62% higher Sharpe, near-zero correlation. The ML ranker lifts the book +0.25 Sharpe at
+corr 0.09 — real diversification. The thin orthogonal edges (index-flow, macro-PPI, stat-arb) and the
+HMM regime trigger would each add a little more (not yet streamed in). Output: `decoded_ensemble_monthly.csv`.
+
+
 ---
 
 ## Round 1 — five parallel frontiers (cross-section / catalysts / factor-regime / ML / cross-asset)
