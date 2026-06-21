@@ -1,0 +1,29 @@
+# qedge — pinned dependency set (exact pins for reproducibility).
+# Core (Phase A) — installed and verified against Python 3.11.
+numpy==1.26.4
+scipy==1.13.1
+pandas==2.2.2
+statsmodels==0.14.2
+pydantic==2.8.2
+pydantic-settings==2.4.0
+python-dotenv==1.0.1
+PyYAML==6.0.1
+httpx==0.27.0
+tenacity==8.5.0
+pyarrow==17.0.0
+
+# Modeling stack (Phase B+) — install before Phase B work-units run.
+scikit-learn==1.5.2
+lightgbm==4.5.0
+shap==0.46.0
+hmmlearn==0.3.2
+river==0.21.2
+ruptures==1.1.9
+joblib==1.4.2
+# Transitively required by the reused startx.learning (metalabel) import chain.
+optuna==3.6.1
+
+# Dev / tooling.
+pytest==8.3.2
+mypy==1.11.2
+ruff==0.6.4
