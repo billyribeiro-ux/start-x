@@ -84,6 +84,7 @@ SLEEVE_RULES = {
 
 _LEDGER_COLS = ["model", "sleeve", "entry_date", "entry_price", "stop_price", "stop_pct",
                 "exit_date", "exit_price", "exit_reason", "bars_held", "ret", "pnl_contrib",
+                "risk_pct", "R",
                 "entry_rule", "exit_rule", "regime", "conviction", "thesis", "outcome"]
 
 
@@ -94,6 +95,17 @@ def _enrich_logic(led: pd.DataFrame) -> pd.DataFrame:
     led = led.copy()
     led["entry_rule"] = led["sleeve"].map(SLEEVE_RULES)
     led["stop_pct"] = ((led["stop_price"] / led["entry_price"] - 1.0) * 100).round(2)
+
+    # --- R-multiple: read the journal in units of RISK, not just % -----------------------
+    # The R unit is the trade's initial 1-ATR risk distance — the fractional gap from entry to
+    # the HARD stop (EXITS uses a 1-ATR hard stop for every sleeve, so stop_price == entry -
+    # 1*ATR). `risk_pct` is that distance as a %, `R` re-expresses the realised return `ret` in
+    # those units: a +1.5% gain on a 1.0%-wide stop is +1.5R; a clean stop-out is ~-1R, and a
+    # gap-through (filled below the stop) prints worse than -1R — the realistic tail.
+    risk_frac = (led["stop_price"] / led["entry_price"] - 1.0).abs()  # 1-ATR risk distance (fraction)
+    led["risk_pct"] = (risk_frac * 100).round(3)                      # the R unit, in %
+    # ret is already a fraction (net of cost); divide by the risk fraction to get risk units.
+    led["R"] = (led["ret"] / risk_frac.where(risk_frac > 0)).round(3)  # NaN-safe on a 0-width stop
 
     def _exit_rule(sl: str) -> str:
         sm, cm, md = EXITS.get(sl, (1.0, 3.0, 252))

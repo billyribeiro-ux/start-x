@@ -133,6 +133,7 @@ def run_portfolio(
     exits: Mapping[str, tuple[float, float, int]] | None = None,  # name -> (stop_mult, chand_mult, max_days)
     start: str | pd.Timestamp | None = None,
     end: str | pd.Timestamp | None = None,
+    entry_fill: str = "close",
 ) -> PortfolioResult:
     """Run the concurrent, vol-sized swing book.
 
@@ -169,6 +170,18 @@ def run_portfolio(
     start, end:
         Optional inclusive window bounds on *entry* dates. The equity curve still spans the
         full in-window SPY date index.
+    entry_fill:
+        Where a new position is filled relative to the signal bar ``i``:
+
+        * ``"close"`` (default, unchanged legacy behaviour) — fill at ``closes[i]``, the
+          signal-day close. The entry bar is the signal bar, so the chandelier/exit window
+          opens on the *next* bar (``i+1``).
+        * ``"next_open"`` — fill at the NEXT bar's open ``opens[i+1]`` (one day later, a
+          realistic non-anticipative execution: you see the signal at the close and trade the
+          following open). ``entry_idx`` is set to ``i+1`` so the exit window starts after the
+          fill bar, and the time cap ``last_day`` is measured from the fill bar. A signal on
+          the last available bar (``i+1`` out of range) is skipped. Used to measure how much
+          of the book's edge is a close-print artifact vs. survives realistic execution.
 
     Returns
     -------
@@ -178,6 +191,8 @@ def run_portfolio(
         raise ValueError("risk_per_trade must be in (0, 1]")
     if port_risk_cap <= 0 or gross_cap <= 0:
         raise ValueError("caps must be positive")
+    if entry_fill not in ("close", "next_open"):
+        raise ValueError("entry_fill must be 'close' or 'next_open'")
 
     p = spy.sort_values("date").reset_index(drop=True)
     n = len(p)
@@ -285,7 +300,17 @@ def run_portfolio(
                 if i not in entry_idx_by_sleeve[name]:
                     continue
                 av = atr_abs[i]
-                entry_price = closes[i]
+                # Fill bar & price depend on entry_fill. "close": fill this bar's close, entry
+                # bar = signal bar i, exit window opens at i+1. "next_open": fill the NEXT
+                # bar's open (a realistic non-anticipative execution one day later), so the
+                # entry/fill bar IS i+1 and the exit window opens at i+2. ATR is the signal-bar
+                # ATR in both cases (known at signal time; non-anticipative).
+                if entry_fill == "next_open":
+                    fill_idx = i + 1  # guaranteed in range by the i + 1 < n loop guard
+                    entry_price = opens[fill_idx]
+                else:
+                    fill_idx = i
+                    entry_price = closes[i]
                 if not np.isfinite(av) or av <= 0 or entry_price <= 0:
                     continue
                 if entry_price in opened_prices_today:
@@ -308,10 +333,13 @@ def run_portfolio(
                 if w <= 0:
                     continue
                 stop_price = entry_price - stop_mult * av  # the HARD stop (recorded for review)
+                # entry_idx is the FILL bar: i for close fills, i+1 for next_open fills. The exit
+                # loop only acts on bars strictly after entry_idx, and the time cap counts from it.
                 open_trades.append(_OpenTrade(
-                    sleeve=name, entry_idx=i, entry_date=day, entry_price=entry_price,
+                    sleeve=name, entry_idx=fill_idx, entry_date=dates.iloc[fill_idx],
+                    entry_price=entry_price,
                     atr_at_entry=av, stop_price=stop_price, weight=w, risk_frac=risk_frac,
-                    peak=entry_price, last_day=min(i + mdays, n - 1),
+                    peak=entry_price, last_day=min(fill_idx + mdays, n - 1),
                     stop_mult=stop_mult, chand_mult=chand_mult))
                 open_sleeves.add(name)
                 opened_prices_today.add(entry_price)
