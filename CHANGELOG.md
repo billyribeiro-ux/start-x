@@ -8,6 +8,10 @@ Evidence lives in `FINDINGS.md`; the locked study window is **Jan 2019 → Jun 2
 ## 2026-06-21
 
 ### Added
+- **Two models kept side by side** (`scripts/run_book.py --model base|guarded|both`, default `both`)
+  so the breadth guard is judged head-to-head, not by assertion: **base** = IBS dip ungated;
+  **guarded** = IBS dip breadth-guarded. `--out` writes one CSV per model; a head-to-head table
+  prints win/PF/maxDD/Sharpe for both. (Per user: race both, log every change.)
 - **Market-internals layer** (`strategy/market_internals.py`). Derives 5 breadth internals from the
   503 S&P-500 constituents (no vendor breadth feed on the FMP plan): % above 50/200d MA,
   advance/decline, up/down volume, new highs−lows, McClellan. Point-in-time (trailing quantiles,
