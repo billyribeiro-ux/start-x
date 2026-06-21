@@ -44,3 +44,4 @@ decoded_*.csv
 .DS_Store
 .idea/
 .vscode/
+model_trades*.csv
