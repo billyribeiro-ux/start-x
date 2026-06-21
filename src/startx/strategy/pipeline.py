@@ -39,11 +39,17 @@ class StrategyResult:
 
 
 def _sorted_arrays(ds: Dataset):
-    """Return X, y, t1, meta re-sorted by date with a fresh RangeIndex (for walk-forward)."""
+    """Return X, y, t1, meta re-sorted by date (X/y/meta on a fresh RangeIndex).
+
+    ``t1`` KEEPS its entry-date index (it is *not* reset) — `walk_forward_predict` reads that
+    datetime index to purge train labels whose span overlaps the test block. Resetting it to a
+    RangeIndex (the old bug) silently disabled the López-de-Prado purge, falling back to a bare
+    positional embargo and leaking multi-bar (long/position-horizon) labels across the seam.
+    """
     order = np.argsort(pd.to_datetime(ds.meta["date"]).to_numpy(), kind="stable")
     X = ds.X.iloc[order].reset_index(drop=True)
     y = ds.y.iloc[order].reset_index(drop=True)
-    t1 = ds.t1.iloc[order].reset_index(drop=True)
+    t1 = ds.t1.iloc[order]  # entry-date index preserved (sorted) for label-span purging
     meta = ds.meta.iloc[order].reset_index(drop=True)
     return X, y, t1, meta
 

@@ -25,7 +25,7 @@ from math import comb
 import numpy as np
 import pandas as pd
 
-from startx.validation.purged_cv import _as_t1, _infer_index, purge_embargo_train
+from startx.validation.purged_cv import _infer_index, label_start_end, purge_embargo_train
 
 
 class CombinatorialPurgedCV:
@@ -83,9 +83,9 @@ class CombinatorialPurgedCV:
         if n != len(self.t1):
             raise ValueError("X and t1 must have the same length / index")
 
-        t1 = _as_t1(self.t1, index)
-        starts = index.to_numpy()
-        ends = t1.to_numpy()
+        # Type-consistent (start, end) label bounds — handles the production RangeIndex-X /
+        # datetime-t1 shape that the raw `index.to_numpy()` choked on (Int64 vs DateTime64).
+        starts, ends = label_start_end(self.t1, index)
         embargo = int(n * self.embargo_pct)
         positions = np.arange(n)
 

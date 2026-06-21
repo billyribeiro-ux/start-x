@@ -57,6 +57,17 @@ attribution engine, and (c) the abandoned `prob_up` ML pipeline — none touch t
   Optuna OOS-AUC tuner; now derives starts from `t1`'s values. Regression test on the RangeIndex shape.
 - **Feature allow-list closed the `candle_` hole.** A numeric `candle_*` column could pass blindly;
   now trusted only if a known candle archetype OR genuinely 0/1-valued. Probe test added.
+- **The label-span purge now actually ENGAGES in the pipeline path** (follow-through on FX2's report).
+  `pipeline._sorted_arrays` reset `t1` to a RangeIndex, discarding the entry-date index
+  `walk_forward_predict` reads — silently downgrading the new purge back to a bare positional embargo.
+  `t1` now keeps its sorted entry-date index.
+- **`cpcv.py` twin RangeIndex crash fixed.** `CombinatorialPurgedCV.split` still used the raw
+  `starts = index.to_numpy()` pattern (the same Int64-vs-DateTime64 bug `PurgedKFold` had); now uses
+  the shared `label_start_end` helper for type-consistent label bounds.
+- **Full `pytest` runs in one process again.** Root `conftest.py` pins the BLAS/OpenMP thread pools to
+  1 (`OMP/OPENBLAS/MKL/NUMEXPR/VECLIB`), so the heavy LightGBM/SHAP modules no longer oversubscribe
+  threads and get the process killed mid-run (the spurious "OOM"/exit-137). One-shot suite: **191
+  passed / 5 skipped**.
 
 ### Fixed (forensic re-audit — causal-attribution engine; HIGH leakage)
 - **Same-day POST-CLOSE catalysts no longer attributed to the move (HIGH).** `attribute.py` used a
