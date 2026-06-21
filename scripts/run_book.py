@@ -83,18 +83,38 @@ SLEEVE_RULES = {
 }
 
 _LEDGER_COLS = ["model", "sleeve", "entry_date", "entry_price", "stop_price", "stop_pct",
-                "exit_date", "exit_price", "exit_reason", "bars_held", "ret", "pnl_contrib",
-                "risk_pct", "R",
+                "exit_date", "exit_price", "exit_reason", "bars_held", "ret", "pnl_per_share",
+                "pnl_contrib", "risk_pct", "R",
                 "entry_rule", "exit_rule", "regime", "conviction", "thesis", "outcome"]
 
 
+def _write_ledger(led: pd.DataFrame, path: str) -> int:
+    """Write the trade ledger in the LOCKED layout + the totals block
+    (TOTAL WIN $, TOTAL LOSS $, NET TOTAL $) summing per-share P&L net of ~2bp cost."""
+    cols = [c for c in _LEDGER_COLS if c in led.columns]
+    body = led[cols].copy()
+    pps = body["pnl_per_share"] if "pnl_per_share" in body else pd.Series(dtype=float)
+    win = float(pps[led["outcome"].values == "WIN"].sum()) if len(pps) else 0.0
+    loss = float(pps[led["outcome"].values == "LOSS"].sum()) if len(pps) else 0.0
+    totals = pd.DataFrame([
+        {"sleeve": "TOTAL WIN $", "pnl_per_share": round(win, 2)},
+        {"sleeve": "TOTAL LOSS $", "pnl_per_share": round(loss, 2)},
+        {"sleeve": "NET TOTAL $", "pnl_per_share": round(win + loss, 2)},
+    ])
+    pd.concat([body, totals], ignore_index=True).to_csv(path, index=False)
+    return len(body)
+
+
 def _enrich_logic(led: pd.DataFrame) -> pd.DataFrame:
-    """Make every trade self-documenting: spell out its entry rule, stop %, and exit rule."""
+    """Make every trade self-documenting: spell out its entry rule, stop %, exit rule, and P&L."""
     if led.empty:
         return led
     led = led.copy()
     led["entry_rule"] = led["sleeve"].map(SLEEVE_RULES)
     led["stop_pct"] = ((led["stop_price"] / led["entry_price"] - 1.0) * 100).round(2)
+    # per-share P&L, net of ~2bp round-trip cost (the locked-layout dollar column)
+    led["pnl_per_share"] = ((led["exit_price"] - led["entry_price"])
+                            - led["entry_price"] * 0.0002).round(2)
 
     # --- R-multiple: read the journal in units of RISK, not just % -----------------------
     # The R unit is the trade's initial 1-ATR risk distance — the fractional gap from entry to
@@ -128,8 +148,8 @@ def _run_one(name, sleeves, spy, aux, start, end, out, gross_cap, entry_fill):
     print("  BOOK NOW:", summarize_book(led))
     if out:
         path = out.replace(".csv", f"_{name}.csv")
-        led[[c for c in _LEDGER_COLS if c in led.columns]].to_csv(path, index=False)
-        print(f"  wrote {len(led)} trades -> {path}")
+        n = _write_ledger(led, path)
+        print(f"  wrote {n} trades (+ TOTAL WIN $/LOSS $/NET $ block) -> {path}")
     return s, led
 
 
@@ -187,8 +207,8 @@ def main() -> None:
     if args.out and len(ledgers) > 1:
         allp = args.out.replace(".csv", "_all.csv")
         comb = pd.concat(ledgers, ignore_index=True)
-        comb[[c for c in _LEDGER_COLS if c in comb.columns]].to_csv(allp, index=False)
-        print(f"\nwrote {len(comb)} trades (all models) -> {allp}")
+        nc = _write_ledger(comb, allp)
+        print(f"\nwrote {nc} trades (all models, + TOTAL WIN $/LOSS $/NET $ block) -> {allp}")
 
     if args.stress:
         _stress_grid(spy, aux, names, args.gross_cap, args.entry_fill)

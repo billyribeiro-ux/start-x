@@ -7,6 +7,17 @@ Evidence lives in `FINDINGS.md`; the locked study window is **Jan 2019 → Jun 2
 
 ## 2026-06-21
 
+### Fixed (ledger layout — LOCKED, user-directed)
+- **Every exported ledger now carries the totals block + per-share P&L** — the locked CSV layout
+  ("always include WIN $, LOSS $, NET $"). `scripts/run_book.py` gained `_write_ledger()`, which
+  appends a 3-row totals block — **TOTAL WIN $ / TOTAL LOSS $ / NET TOTAL $** — summing a new
+  `pnl_per_share` column (per-share P&L = exit − entry − entry×0.0002, the ~2bp SPY round-trip cost).
+  `pnl_per_share` sits right after `ret`; WIN/SCRATCH dollars are summed to the win side, LOSS to the
+  loss side (a +1-ATR/breakeven exit is a WIN/SCRATCH, never a LOSS). Both per-model exports and the
+  combined `_all.csv` route through it. Re-baseline FULL 2019-26 @ 1.5×:
+  **base** 82 trades, NET **+$618.21/sh** (WIN +$862.04 / LOSS −$243.83);
+  **guarded** 70 trades, NET **+$615.54/sh** (WIN +$810.95 / LOSS −$195.41).
+
 ### Decode campaign — Round 1 (5 parallel Opus agents)
 - **TWO real new edges cleared the firewall:** (1) **Reaction-PEAD** — buy the earnings-reaction
   gap-up, hold 10-20d: OOS +9-13%/yr, t≈2.1, broad (~450 names); (2) **cross-sectional ML ranker**
