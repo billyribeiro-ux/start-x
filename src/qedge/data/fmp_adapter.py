@@ -65,12 +65,29 @@ class NewsSource(Protocol):
     def __call__(self, symbol: str) -> pd.DataFrame: ...
 
 
+def _cache_covers_start(cached: pd.DataFrame | None, start: str) -> bool:
+    """True iff a cached price frame reaches back to (or before) ``start``.
+
+    The reused startx price cache keys by symbol only (no date range), so a frame
+    cached under an earlier, *later*-starting request would otherwise be served for
+    a request that needs MORE history. We treat a missing/empty cache, or one whose
+    earliest bar is after ``start``, as insufficient coverage -> force a refresh.
+    """
+    if cached is None or cached.empty or "date" not in cached.columns:
+        return False
+    min_date = pd.to_datetime(cached["date"], errors="coerce").min()
+    return bool(pd.notna(min_date) and min_date <= pd.Timestamp(start))
+
+
 @dataclass(frozen=True, slots=True)
 class _StartxPriceSource:
     """Default :class:`PriceSource`: cached startx FMP daily history.
 
     The FMP client (which reads the API key from ``.env`` via startx settings)
     and the parquet cache are constructed on first call, never at import time.
+    The cache is refreshed from FMP whenever it does not already cover the
+    requested ``start`` (the startx cache key is date-less, so a narrower cached
+    window must not silently satisfy a request for earlier history).
     """
 
     cache_dir: str
@@ -79,7 +96,9 @@ class _StartxPriceSource:
         client = FMPClient()
         try:
             cache = ParquetCache(self.cache_dir)
-            return get_prices(client, cache, symbol, history_start=start)
+            cached = cache.load(f"prices/{symbol}")
+            refresh = not _cache_covers_start(cached, start)
+            return get_prices(client, cache, symbol, history_start=start, refresh=refresh)
         finally:
             client.close()
 
@@ -160,11 +179,25 @@ class FMPPriceFeed:
     def history(
         self, symbol: str, *, asof: pd.Timestamp, start: pd.Timestamp | None = None
     ) -> pd.DataFrame:
-        """Return ``[date, open, high, low, close, volume]`` with ``date <= asof``."""
+        """Return ``[date, open, high, low, close, volume]`` within ``[start, asof]``.
+
+        The upper bound (``date <= asof``) is the point-in-time guarantee. The lower
+        bound (``date >= start``) is enforced HERE rather than trusted to the fetch:
+        the reused startx price cache keys by symbol only (no date range), so a
+        frame cached on an earlier, wider request is returned wholesale and would
+        otherwise leak history before ``start``. Clipping locally makes the
+        selected analysis window authoritative regardless of cache state.
+        """
         raw = self._source(symbol, start=_resolve_start(start, self._config))
         if raw.empty:
             return pd.DataFrame(columns=list(_PRICE_COLUMNS))
-        return _pit_filter(raw, _PRICE_TS_COL, asof, _PRICE_COLUMNS)
+        out = _pit_filter(raw, _PRICE_TS_COL, asof, _PRICE_COLUMNS)
+        if start is not None:
+            start_ts = pd.Timestamp(start)
+            if start_ts.tz is not None:
+                start_ts = start_ts.tz_localize(None)
+            out = out.loc[out[_PRICE_TS_COL] >= start_ts].reset_index(drop=True)
+        return out
 
 
 class FMPFundamentalsFeed:
