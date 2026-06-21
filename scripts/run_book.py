@@ -21,7 +21,7 @@ from startx.portfolio.thesis import annotate_theses, summarize_book
 from startx.portfolio.validate import confidence_scorecard
 from startx.strategy.mean_reversion import ibs_signals
 from startx.strategy.momentum_breakout import breakout_signals
-from startx.strategy.volatility_premium import vrp_high_signals, vvix_spike_signals
+from startx.strategy.volatility_premium import fear_signals
 
 
 def _load(sym: str) -> pd.DataFrame:
@@ -30,12 +30,13 @@ def _load(sym: str) -> pd.DataFrame:
     return p.sort_values("date").reset_index(drop=True)
 
 
-#: The book: four validated, independent sleeves wrapped to the engine's ``sig(spy, aux)`` contract.
+#: The book: three independent sleeves wrapped to the engine's ``sig(spy, aux)`` contract. The two
+#: vol-premium triggers (VRP, VVIX) are MERGED into one ``fear`` sleeve so a vol spike books a single
+#: position, not two identical ones (fixes the 2026-03-18 same-bar/same-price stacking).
 SLEEVES = {
     "breakout": lambda s, a: breakout_signals(s, 20, 200),   # the trend edge (only real alpha)
     "ibs": lambda s, a: ibs_signals(s),                      # oversold-dip exposure timing
-    "vrp": lambda s, a: vrp_high_signals(s, a["vix"]),       # vol-risk-premium long
-    "vvix": lambda s, a: vvix_spike_signals(s, a["vvix"]),   # vol-of-vol fear long (replaces capitulation)
+    "fear": lambda s, a: fear_signals(s, a["vix"], a["vvix"]),  # VRP ∪ VVIX vol-premium long (one position)
 }
 
 

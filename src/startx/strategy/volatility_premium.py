@@ -135,6 +135,23 @@ def vvix_spike_signals(index_prices: pd.DataFrame, vvix: pd.DataFrame, *, lookba
     return fire.fillna(False).astype(bool)
 
 
+def fear_signals(index_prices: pd.DataFrame, vix: pd.DataFrame, vvix: pd.DataFrame, *,
+                 rv_window: int = 20, lookback: int = 252, vrp_pct: float = 0.95,
+                 vvix_pct: float = 0.90) -> pd.Series:
+    """The MERGED fear sleeve: fire if VRP **or** VVIX fires — counted ONCE.
+
+    VRP and VVIX are two lenses on the same thing (over-priced fear) and co-fire ~53% of the time
+    (corr 0.36). Run as separate sleeves they double-count: on a vol spike both trigger the same bar,
+    same price, same ATR -> the engine books two identical SPY longs (3× with an IBS dip), which is
+    concentration masquerading as diversification (the 2026-03-18 −4%×3 cluster). Merging them into
+    one OR'd trigger keeps the union of entries while taking a single position per fear episode.
+    """
+    p = index_prices.sort_values("date").reset_index(drop=True)
+    vrp = vrp_high_signals(p, vix, rv_window=rv_window, lookback=lookback, pct=vrp_pct)
+    vvx = vvix_spike_signals(p, vvix, lookback=lookback, pct=vvix_pct)
+    return (vrp | vvx).fillna(False).astype(bool)
+
+
 # --------------------------------------------------------------------------------------------------
 # Backtest (mirrors the sibling sleeves so the portfolio engine / validation can price these trades)
 # --------------------------------------------------------------------------------------------------

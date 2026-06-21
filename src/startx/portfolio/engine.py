@@ -221,6 +221,7 @@ def run_portfolio(
     for i in range(n):
         day = dates.iloc[i]
         exited_today: set[str] = set()  # a sleeve that exits today cannot re-enter today (no churn)
+        opened_prices_today: set[float] = set()  # no two positions at the same entry price this bar
 
         # 1) EXITS FIRST — chandelier trail or time cap. Freed risk budget is reusable today.
         still_open: list[_OpenTrade] = []
@@ -275,6 +276,8 @@ def run_portfolio(
                 entry_price = closes[i]
                 if not np.isfinite(av) or av <= 0 or entry_price <= 0:
                     continue
+                if entry_price in opened_prices_today:
+                    continue  # de-dup: another sleeve already opened this exact bar/price (no stacking)
                 atr_pct = av / entry_price
                 risk_frac = atr_mult * atr_pct  # fractional distance to the initial stop
                 if risk_frac <= 0:
@@ -292,6 +295,7 @@ def run_portfolio(
                     atr_at_entry=av, stop_price=stop_price, weight=w, risk_frac=risk_frac,
                     peak=entry_price, last_day=min(i + max_days, n - 1)))
                 open_sleeves.add(name)
+                opened_prices_today.add(entry_price)
                 used_risk += risk_frac * w
                 used_gross += w
 
