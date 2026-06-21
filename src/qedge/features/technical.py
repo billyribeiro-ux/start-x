@@ -31,17 +31,24 @@ from typing import Final
 import numpy as np
 import pandas as pd
 
-from qedge.config import LabelingConfig, get_config
+from qedge.config import FeatureConfig, LabelingConfig, get_config
 from qedge.data.boundary import BoundaryKind, InformationBoundary
 from qedge.features.base import REGISTRY, FeatureSpec
+from qedge.features.fracdiff import frac_diff_ffd, fracdiff_boundary
 
 __all__ = [
+    "atr_pct",
+    "dist_from_sma",
+    "downside_semidev",
+    "fracdiff_logclose",
     "ibs",
     "momentum",
     "overnight_gap",
     "realized_vol",
+    "return_skew",
     "rsi",
     "trailing_return",
+    "vol_of_vol",
 ]
 
 # --- Feature periods not owned by a config field --------------------------
@@ -57,11 +64,30 @@ _RSI_PERIOD: Final[int] = 14
 _RSI_SCALE: Final[float] = 100.0
 #: Trading days per year, for annualising realized volatility.
 _TRADING_DAYS_PER_YEAR: Final[int] = 252
+#: Longer-horizon feature windows (trading days), spanning distinct economic axes
+#: from the short lookbacks above: ~6-month momentum, ~quarter vol / semidev / skew,
+#: the 200-day trend SMA, and the inner/outer windows of vol-of-vol. Named (not
+#: bare) constants with a stated rationale, per the no-magic-numbers rule.
+_MOM_LONG_WINDOW: Final[int] = 126
+_VOL_LONG_WINDOW: Final[int] = 63
+#: Trend SMA window (~5 months). Kept below the 200-day classic so the warm-up is
+#: proportionate to a short-swing book and does not strand most of a moderate history.
+_SMA_TREND_WINDOW: Final[int] = 100
+_VOV_INNER_WINDOW: Final[int] = 21
+_VOV_OUTER_WINDOW: Final[int] = 63
+_SEMIDEV_WINDOW: Final[int] = 63
+_ATR_PERIOD: Final[int] = 14
+_SKEW_WINDOW: Final[int] = 63
 
 
 def _config_labeling() -> LabelingConfig:
     """Return the labeling config section (source of the vol/momentum windows)."""
     return get_config().labeling
+
+
+def _config_features() -> FeatureConfig:
+    """Return the features config section (source of the fracdiff feature params)."""
+    return get_config().features
 
 
 def _close(df: pd.DataFrame) -> pd.Series[float]:
@@ -218,6 +244,93 @@ def overnight_gap(df: pd.DataFrame) -> pd.Series[float]:
     return open_ / prev_close - 1.0
 
 
+def dist_from_sma(df: pd.DataFrame, window: int) -> pd.Series[float]:
+    """Distance of the close from its trailing ``window``-bar SMA: ``close/SMA - 1``.
+
+    A trend / stretch signal: positive when price is extended above its moving
+    average, negative when below. The SMA is a trailing rolling mean (bars ``<= t``
+    only); the first ``window-1`` rows are ``NaN``.
+    """
+    if window <= 0:
+        raise ValueError("window must be > 0")
+    close = _close(df)
+    sma = close.rolling(window=window).mean()
+    return close / sma - 1.0
+
+
+def vol_of_vol(df: pd.DataFrame, inner: int, outer: int) -> pd.Series[float]:
+    """Volatility-of-volatility: trailing ``outer``-bar std of the rolling ``inner``-bar
+    realized vol of daily log returns. Captures vol clustering/instability. Pure
+    trailing windows; warm-up rows are ``NaN``.
+    """
+    if inner < 2 or outer < 2:
+        raise ValueError("inner and outer windows must be >= 2")
+    close = _close(df)
+    log_ret = np.log(close / close.shift(1))
+    inner_vol = log_ret.rolling(window=inner).std(ddof=1)
+    return inner_vol.rolling(window=outer).std(ddof=1)
+
+
+def downside_semidev(df: pd.DataFrame, window: int) -> pd.Series[float]:
+    """Annualised downside semi-deviation of trailing daily log returns over ``window``.
+
+    ``sqrt(mean(min(r, 0)^2) * 252)`` — penalises only adverse moves. Pure trailing
+    window (bars ``<= t``); warm-up rows are ``NaN``.
+    """
+    if window < 2:
+        raise ValueError("window must be >= 2")
+    close = _close(df)
+    log_ret = np.log(close / close.shift(1))
+    downside_sq = log_ret.clip(upper=0.0) ** 2
+    mean_sq = downside_sq.rolling(window=window).mean()
+    return np.sqrt(mean_sq * float(_TRADING_DAYS_PER_YEAR))
+
+
+def atr_pct(df: pd.DataFrame, period: int) -> pd.Series[float]:
+    """Average True Range over ``period`` bars as a fraction of the close.
+
+    True range uses the *prior* close (read via an explicit one-bar shift), so the
+    value at ``t`` uses only bars ``<= t``. ATR is the trailing rolling mean of the
+    true range; the result is divided by the close to be scale-free. Warm-up rows
+    are ``NaN``.
+    """
+    if period <= 0:
+        raise ValueError("period must be > 0")
+    high = df["high"].astype("float64")
+    low = df["low"].astype("float64")
+    close = _close(df)
+    prev_close = close.shift(1)
+    true_range = pd.concat(
+        [(high - low), (high - prev_close).abs(), (low - prev_close).abs()], axis=1
+    ).max(axis=1)
+    atr = true_range.rolling(window=period).mean()
+    return (atr / close).astype("float64")
+
+
+def return_skew(df: pd.DataFrame, window: int) -> pd.Series[float]:
+    """Trailing skewness of daily log returns over ``window`` bars.
+
+    Distributional asymmetry of recent returns (negative => crash-prone tail).
+    Pure trailing rolling skew; warm-up rows are ``NaN``.
+    """
+    if window < 3:
+        raise ValueError("window must be >= 3 for a skewness estimate")
+    close = _close(df)
+    log_ret = np.log(close / close.shift(1))
+    return log_ret.rolling(window=window).skew()
+
+
+def fracdiff_logclose(df: pd.DataFrame, d: float, threshold: float) -> pd.Series[float]:
+    """Fractionally-differenced log close (fixed-width FFD) — stationary with memory.
+
+    Delegates to :func:`qedge.features.fracdiff.frac_diff_ffd`, whose fixed backward
+    window is the point-in-time guarantee: the value at ``t`` depends only on log
+    closes at ``<= t``. Leading rows (insufficient window) are ``NaN``.
+    """
+    log_close = np.log(_close(df))
+    return frac_diff_ffd(log_close, d, threshold).astype("float64")
+
+
 # --------------------------------------------------------------------------- #
 # Registration. Each spec carries an explicit TRAILING InformationBoundary so
 # the registry-wide canary can assert no-lookahead and a non-null boundary.
@@ -240,8 +353,11 @@ def _register_all() -> None:
     import time.
     """
     labeling = _config_labeling()
+    features_cfg = _config_features()
     vol_window = labeling.short_vol_span
     momentum_window = labeling.long_horizon_days
+    fd_d = features_cfg.fracdiff_feature_d
+    fd_thresh = features_cfg.fracdiff_weight_threshold
 
     specs: list[FeatureSpec] = [
         FeatureSpec(
@@ -313,6 +429,73 @@ def _register_all() -> None:
                 "Overnight gap open_t/close_prev-1; prior close is lagged one "
                 "bar, available at the open of t.",
             ),
+        ),
+        FeatureSpec(
+            name=f"dist_sma_{_SMA_TREND_WINDOW}",
+            fn=lambda df: dist_from_sma(df, _SMA_TREND_WINDOW),
+            boundary=_trailing(
+                _SMA_TREND_WINDOW,
+                f"close/SMA({_SMA_TREND_WINDOW})-1 trend stretch; trailing rolling "
+                "mean over bars <= t.",
+            ),
+        ),
+        FeatureSpec(
+            name=f"mom_{_MOM_LONG_WINDOW}d",
+            fn=lambda df: momentum(df, _MOM_LONG_WINDOW),
+            boundary=_trailing(
+                _MOM_LONG_WINDOW,
+                f"Trailing {_MOM_LONG_WINDOW}-bar (~6-month) momentum; bars <= t only.",
+            ),
+        ),
+        FeatureSpec(
+            name=f"rvol_{_VOL_LONG_WINDOW}d",
+            fn=lambda df: realized_vol(df, _VOL_LONG_WINDOW),
+            boundary=_trailing(
+                _VOL_LONG_WINDOW + 1,
+                f"Annualised realized vol of the trailing {_VOL_LONG_WINDOW} daily "
+                "log returns ending at t; bars <= t only.",
+            ),
+        ),
+        FeatureSpec(
+            name=f"volvol_{_VOV_INNER_WINDOW}_{_VOV_OUTER_WINDOW}",
+            fn=lambda df: vol_of_vol(df, _VOV_INNER_WINDOW, _VOV_OUTER_WINDOW),
+            boundary=_trailing(
+                _VOV_INNER_WINDOW + _VOV_OUTER_WINDOW,
+                f"Vol-of-vol: {_VOV_OUTER_WINDOW}-bar std of the {_VOV_INNER_WINDOW}-bar "
+                "realized vol; nested trailing windows <= t.",
+            ),
+        ),
+        FeatureSpec(
+            name=f"semidev_{_SEMIDEV_WINDOW}d",
+            fn=lambda df: downside_semidev(df, _SEMIDEV_WINDOW),
+            boundary=_trailing(
+                _SEMIDEV_WINDOW + 1,
+                f"Annualised downside semi-deviation over the trailing "
+                f"{_SEMIDEV_WINDOW} daily log returns; bars <= t only.",
+            ),
+        ),
+        FeatureSpec(
+            name=f"atr_pct_{_ATR_PERIOD}",
+            fn=lambda df: atr_pct(df, _ATR_PERIOD),
+            boundary=_trailing(
+                _ATR_PERIOD + 1,
+                f"ATR({_ATR_PERIOD})/close; true range uses the lagged prior close, "
+                "so the value at t uses bars <= t.",
+            ),
+        ),
+        FeatureSpec(
+            name=f"skew_{_SKEW_WINDOW}d",
+            fn=lambda df: return_skew(df, _SKEW_WINDOW),
+            boundary=_trailing(
+                _SKEW_WINDOW + 1,
+                f"Trailing {_SKEW_WINDOW}-bar skewness of daily log returns; "
+                "bars <= t only.",
+            ),
+        ),
+        FeatureSpec(
+            name="fracdiff_logclose",
+            fn=lambda df: fracdiff_logclose(df, fd_d, fd_thresh),
+            boundary=fracdiff_boundary(fd_d, fd_thresh),
         ),
     ]
     for spec in specs:

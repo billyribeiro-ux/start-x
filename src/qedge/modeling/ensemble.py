@@ -109,13 +109,9 @@ class FamilyEnsembleClassifier:
         """Build the ensemble; ``config`` defaults to the process-wide qedge config singleton."""
         self._config = config if config is not None else get_config()
         self._seed = self._config.scanner.seed
-        self._members: list[tuple[str, CalibratedClassifierCV]] = [
-            (
-                name,
-                CalibratedClassifierCV(estimator, cv=_N_CALIBRATION_FOLDS, method="sigmoid"),
-            )
-            for name, estimator in _build_members(self._seed)
-        ]
+        # Members are constructed at fit time: the calibration fold count depends on
+        # the class balance of y, so it cannot be fixed in the constructor.
+        self._members: list[tuple[str, ClassifierMixin]] = []
         self.classes_: NDArray[np.int_] | None = None
 
     def fit(
@@ -123,13 +119,31 @@ class FamilyEnsembleClassifier:
         X: pd.DataFrame | NDArray[np.float64],
         y: pd.Series | NDArray[np.int_],
     ) -> FamilyEnsembleClassifier:
-        """Fit every calibrated family member on ``(X, y)``; returns ``self``."""
+        """Fit every family member on ``(X, y)`` with calibration; returns ``self``.
+
+        Probability calibration uses an internal CV that needs at least ``folds``
+        samples in the SMALLEST class. On thin or imbalanced event sets (few clean
+        labels survive a long feature warm-up) that is not satisfiable, so we shrink
+        the fold count to the minority-class size and, below two, fall back to the
+        raw (uncalibrated) estimator rather than crash — graceful degradation.
+        """
         X_arr = np.asarray(X, dtype=np.float64)
         y_arr = np.asarray(y)
-        for _, member in self._members:
+        counts = np.unique(y_arr, return_counts=True)[1]
+        min_class = int(counts.min()) if counts.size else 0
+        folds = min(_N_CALIBRATION_FOLDS, min_class)
+        members: list[tuple[str, ClassifierMixin]] = []
+        for name, estimator in _build_members(self._seed):
+            member: ClassifierMixin = (
+                CalibratedClassifierCV(estimator, cv=folds, method="sigmoid")
+                if folds >= 2
+                else estimator
+            )
             member.fit(X_arr, y_arr)
+            members.append((name, member))
+        self._members = members
         # All members share the label space; take it from the first fitted member.
-        self.classes_ = np.asarray(self._members[0][1].classes_)
+        self.classes_ = np.asarray(members[0][1].classes_)
         return self
 
     def predict_proba(self, X: pd.DataFrame | NDArray[np.float64]) -> NDArray[np.float64]:

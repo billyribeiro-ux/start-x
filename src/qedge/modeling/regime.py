@@ -41,6 +41,10 @@ from qedge.config import QedgeConfig, get_config
 # clustering is rank/quantile based so the constant never enters a threshold.
 _TRADING_DAYS_PER_YEAR: int = 252
 
+# Standard-deviation floor for fit-time z-scoring: a column whose std is at or
+# below this is treated as constant and scaled by 1.0 (no divide-by-zero).
+_STD_FLOOR: float = 1.0e-12
+
 
 def _as_matrix(X: pd.DataFrame | NDArray[np.float64]) -> NDArray[np.float64]:
     """Coerce a feature input to a 2-D float64 ndarray (no copy when possible)."""
@@ -92,6 +96,13 @@ class HMMRegimeDetector:
         )
         self.n_iter: int = n_iter if n_iter is not None else self._cfg.regime.hmm_n_iter
         self._model: GaussianHMM | None = None
+        # Fit-time standardisation stats (constants after fit). Standardising the
+        # inputs is what lets Gaussian Baum-Welch converge cleanly when the feature
+        # columns live on wildly different scales (e.g. RSI 0-100 vs returns ~0.01);
+        # because the stats are FIXED at fit time the per-t transform is constant,
+        # so filtered inference at t still consumes only rows <= t (no leakage).
+        self._mean: NDArray[np.float64] | None = None
+        self._std: NDArray[np.float64] | None = None
 
     @property
     def model(self) -> GaussianHMM:
@@ -107,15 +118,26 @@ class HMMRegimeDetector:
         by design; only per-timestamp *inference* is constrained to be causal.
         """
         matrix = _as_matrix(X)
+        # Standardise on fit-time column stats (std floored away from zero so a
+        # constant column cannot divide by zero); store them for inference.
+        self._mean = matrix.mean(axis=0)
+        std = matrix.std(axis=0, ddof=0)
+        self._std = np.where(std > _STD_FLOOR, std, 1.0)
         model = GaussianHMM(
             n_components=self.n_states,
             covariance_type=self.covariance_type,
             n_iter=self.n_iter,
             random_state=self._cfg.scanner.seed,
         )
-        model.fit(matrix)
+        model.fit(self._standardize(matrix))
         self._model = model
         return self
+
+    def _standardize(self, matrix: NDArray[np.float64]) -> NDArray[np.float64]:
+        """Apply the stored fit-time z-score transform (identity if not yet fit)."""
+        if self._mean is None or self._std is None:
+            return matrix
+        return (matrix - self._mean) / self._std
 
     def _filtered_log_alpha(
         self, matrix: NDArray[np.float64]
@@ -140,7 +162,9 @@ class HMMRegimeDetector:
             log_startprob = np.log(model.startprob_)
             log_transmat = np.log(model.transmat_)
         # Per-observation emission log-likelihoods b_j(o_t): shape (n_obs, n_states).
-        framelogprob: NDArray[np.float64] = model._compute_log_likelihood(matrix)
+        framelogprob: NDArray[np.float64] = model._compute_log_likelihood(
+            self._standardize(matrix)
+        )
 
         log_alpha = np.empty((n_obs, self.n_states), dtype=np.float64)
         # t = 0: prior * emission, then normalise.

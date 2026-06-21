@@ -62,6 +62,9 @@ class FeatureConfig(BaseModel):
     )
     fracdiff_adf_pvalue: float = 0.05
     fracdiff_weight_threshold: float = 1e-4  # FFD fixed-window weight cutoff
+    # Fixed differencing order for the fracdiff-of-log-close FEATURE (distinct from
+    # the adaptive min_d search): 0.5 keeps long memory while restoring stationarity.
+    fracdiff_feature_d: float = 0.5
     # Hierarchical feature clustering (correlation distance) before importance.
     cluster_distance_threshold: float = 0.5
 
@@ -71,7 +74,9 @@ class RegimeConfig(BaseModel):
 
     hmm_n_states: int = 3
     hmm_covariance_type: str = "diag"
-    hmm_n_iter: int = 100
+    # With fit-time standardisation the EM converges well within this cap; raised
+    # from 100 to give Baum-Welch ample room so no ConvergenceWarning is emitted.
+    hmm_n_iter: int = 200
     changepoint_penalty: float = 10.0
     regime_lookback_days: int = 252
 

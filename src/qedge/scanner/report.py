@@ -19,6 +19,7 @@ partially-probed scan for a fully-exercised one.
 """
 from __future__ import annotations
 
+import math
 from typing import Final
 
 import pandas as pd
@@ -95,10 +96,29 @@ def _fmt_metric(value: float) -> str:
 
 
 def _fmt_aum(value: float) -> str:
-    """Render a break-even AUM as a thousands-grouped USD amount."""
+    """Render a break-even AUM as a thousands-grouped USD amount.
+
+    ``+inf`` means impact never erodes the edge within the model's bracket, which
+    reads as "unbounded" rather than a literal ``$inf``.
+    """
     if value != value:  # NaN
         return "nan"
+    if math.isinf(value):
+        return "unbounded"
     return f"${value:,.0f}"
+
+
+def _fmt_capacity(result: EdgeResult) -> str:
+    """Render the capacity ceiling, but only when there is an edge to size.
+
+    The break-even AUM answers "at what AUM does the edge die" — a question that
+    is only meaningful once an edge has cleared the survival gate. For a candidate
+    that FAILS the gate we report ``N/A`` rather than a misleading dollar figure
+    (or ``unbounded``) for a strategy that was judged non-robust in the first place.
+    """
+    if not result.passed:
+        return _NONE_CELL
+    return _fmt_aum(result.break_even_aum_usd)
 
 
 def _fmt_verdict(result: EdgeResult) -> str:
@@ -133,7 +153,7 @@ def _scorecard_row(result: EdgeResult) -> tuple[str, ...]:
         _fmt_metric(result.deflated_sharpe),
         _fmt_metric(result.pbo),
         _fmt_verdict(result),
-        _fmt_aum(result.break_even_aum_usd),
+        _fmt_capacity(result),
         _fmt_top_features(result.top_features),
         _fmt_dims(result.unpopulated_dimensions),
     )
@@ -217,7 +237,7 @@ def format_edge(result: EdgeResult) -> str:
         f"  OOS Sharpe        : {_fmt_metric(result.oos_sharpe)}",
         f"  Deflated Sharpe   : {_fmt_metric(result.deflated_sharpe)}",
         f"  PBO               : {_fmt_metric(result.pbo)}",
-        f"  Break-even AUM    : {_fmt_aum(result.break_even_aum_usd)}",
+        f"  Break-even AUM    : {_fmt_capacity(result)}",
         f"  Top features      : {_fmt_top_features(result.top_features)}",
         f"  Feature hash      : {result.feature_snapshot_hash}",
         f"  Run id            : {result.run_id}",

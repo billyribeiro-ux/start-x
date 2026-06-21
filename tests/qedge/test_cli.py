@@ -30,7 +30,7 @@ from qedge.scanner import cli  # noqa: E402  (after importorskip gate)
 
 # A short momentum-blocked window: enough events for a defined CPCV while keeping
 # the single heavy ensemble fit tractable (mirrors the pipeline test fixture).
-_N_BARS = 240
+_N_BARS = 400  # > the longest feature warm-up (126-bar momentum) plus ample foldable events
 _BLOCK = 20
 _DRIFT = 0.004
 _NOISE_SD = 0.003

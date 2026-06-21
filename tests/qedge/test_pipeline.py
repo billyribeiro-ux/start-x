@@ -39,9 +39,13 @@ from qedge.scanner.pipeline import (  # noqa: E402  (after importorskip gate)
 
 # A short, momentum-blocked window keeps the real (heavy) ensemble fits tractable
 # while still giving the CPCV enough events for a defined DSR/PBO.
-_N_BARS = 240
+_N_BARS = 400  # > the longest feature warm-up (126-bar momentum) plus ample foldable events
 _BLOCK = 20  # length of each consistent-drift block (> the 10-day short horizon)
-_DRIFT = 0.004  # per-bar block drift; large vs the noise so the edge is foldable
+# Per-bar block drift, deliberately strong relative to the noise so the planted
+# momentum edge is unambiguously foldable and clears the DSR/PBO gate even with the
+# full (16-feature) conditioning set — the richer the feature space, the more the
+# deflated metric penalises a marginal edge, so the test edge must be genuinely large.
+_DRIFT = 0.008
 _NOISE_SD = 0.003
 _SEED = 7
 _INITIAL_PRICE = 100.0
