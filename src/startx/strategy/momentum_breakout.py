@@ -88,7 +88,7 @@ def backtest(prices: pd.DataFrame, *, lookback: int = 20, trend_ma: int = 200, e
             pnl_per_share=round((float(ep) - e) - e * cost, 2),
             breakout_high=round(float(p["close"].iloc[max(0, i - lookback):i].max()), 2),
             atr_pct=round(av / e * 100, 2), mfe_pct=round(mfe * 100, 2),
-            outcome=("WIN" if (float(ep) / e - 1) - cost > 0 else "LOSS"),
+            outcome=("WIN" if (float(ep) / e - 1) - cost > 0 else "SCRATCH" if (float(ep) / e - 1) - cost == 0 else "LOSS"),
         ))
     trades = pd.DataFrame(rows)
     return trades, _stats(trades)

@@ -34,6 +34,13 @@ is tested, and `normalize_ledger` charges cost once. Binary WIN/LOSS lives only 
   WIN/SCRATCH" rule, scratch now sums on the WIN side and **NET TOTAL $ = every trade**. New
   `tests/test_run_book_ledger.py` locks the layout + totals math (incl. a scratch row). (Live SPY
   runs emit zero scratch today, so today's NET is numerically unchanged — but now correct by construction.)
+- **Research sleeve helpers harmonized to WIN/SCRATCH/LOSS + first dedicated tests.** The standalone
+  `backtest()` in `momentum_breakout.py` and `volatility_premium.py` classified outcomes binary
+  WIN/LOSS (a breakeven counted as LOSS — violating the locked rule, though these are research
+  helpers, not the production ledger). Both now use `>0 WIN / ==0 SCRATCH / <0 LOSS`, matching
+  `engine._ledger_row`. Added `tests/test_momentum_breakout.py` (9) and `tests/test_volatility_premium.py`
+  (11) — the two trusted-but-untested sleeves now have real coverage (signals + backtest smokes).
+  Suite **141 → 162**.
 
 ### Fixed (correctness — the off-by-one the audit's new tests surfaced)
 - **`vix_capitulation.capitulation_signals` fired one close early.** The run-length counter grouped by
