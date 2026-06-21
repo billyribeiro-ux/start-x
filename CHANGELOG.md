@@ -7,6 +7,38 @@ Evidence lives in `FINDINGS.md`; the locked study window is **Jan 2019 → Jun 2
 
 ## 2026-06-21
 
+### Calibrated & locked — System #2: long_swing (4 parallel Opus agents)
+- **long_swing (breakout + fear, weeks→~3 months) is locked at max_days = 63** and OOS-validated by a
+  4-agent drill (cap-sweep / ledger-integrity / sleeve-decomposition / overfit-firewall):
+  - **Cap sweep:** every cap 21-126d is positive in BOTH train and test; tight caps (21/40) demonstrably
+    chop live winners (a third of trades hit the clock still winning at cap 21). Runner-harvest plateaus
+    by ~63-90d. **63 is the spec-faithful "~3 month" lock** (90 is marginally higher Calmar but the gap is
+    inside the noise, and 90 creeps past the stated horizon).
+  - **Ledger integrity: CLEAN** — no churn, no same-bar stacking, honest gap fills (all 54 exits inside
+    [low,high] or the open). The biggest in-horizon winner (+$96.48/sh) rode the chandelier, not the cap.
+    Independently confirmed the 2020 COVID rebound wants to run **458 bars → position-book territory**,
+    so capping at 63 is correct horizon discipline, not a clipped runner.
+  - **Keep both sleeves:** each clears the firewall standalone; they diversify by holding-TIME coverage
+    (fear adds 117 otherwise-flat days, fires across all regimes); combining lifts Sharpe 0.42→0.50,
+    Calmar 0.66→0.87. Fear is a thin 19-trade diversifier — sized small.
+  - **Firewall verdict — real but FRAGILE:** 27/27 parameter-perturbation cells positive (broad plateau,
+    no knife-edge); **NOT a COVID mirage** (drop 2020 → still +66% / Sharpe 1.02; 6 of 8 years positive);
+    replicates on SPY/^GSPC/QQQ but **vanishes on small-caps (IWM)**. Deflated Sharpe **0.81–0.86** —
+    clears the 0.70 fragile floor, below the 0.95 "REAL" bar. Tradeable as a thin large-cap edge.
+  - **Headline (2019-26, SPY, cap 63):** 54 trades, 46% win, **+87.4%**, PF 3.25, maxDD −10.1%,
+    in-window Sharpe **1.07**. Train +24.9% / 0.75; Test +50.0% / 1.39 (OOS ≥ train, no decay).
+
+### Fixed (engine — measurement bug found by the firewall drill)
+- **In-window Sharpe.** `run_portfolio` computed Sharpe/maxDD/exposure over the FULL price index
+  (1993→2026), so the flat pre-window days diluted the annualised Sharpe by ~√(total/in-window) — a
+  true **1.07** long_swing Sharpe was reported as **0.50**. Stats are now sliced (and rebased) to the
+  study window `[start, end]`. Corrects EVERY book's Sharpe (short_swing 0.38/0.40 → **0.81/0.84**).
+  Locked with a regression test (`tests/test_portfolio_engine.py`): leading flat history must not
+  change in-window Sharpe/total_return. (107→109 tests pass.)
+- **`base`==`guarded` no-op removed.** long_swing/position carry no breadth-gated sleeve, so a "guarded"
+  run was byte-identical to base — they now expose a single `base` model; `run_book.py` resolves the
+  requested `--model` against what each book actually provides.
+
 ### Docs — recommendations captured
 - **`ROADMAP.md` now leads with a dated, priority-ordered "next improvements" list** (hardest-evidence
   first): calibrate & lock System #2 (long_swing) and #3 (position); walk-forward the *parameters*

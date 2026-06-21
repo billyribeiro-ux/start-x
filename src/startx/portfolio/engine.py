@@ -360,9 +360,26 @@ def run_portfolio(
     # --- assemble outputs --------------------------------------------------------------- #
     ledger = _build_ledger(rows)
     equity_series = pd.Series(equity_curve, index=pd.DatetimeIndex(dates), name="equity")
-    daily_ret = pd.Series(equity_curve, index=equity_series.index).pct_change().fillna(0.0)
-    stats = _book_stats(ledger, equity_series, list(sleeves.keys()), cost_bps,
-                        daily_ret=daily_ret)
+
+    # Headline stats are reported over the STUDY WINDOW [start, end] only. Entries are
+    # window-restricted, so the book sits flat at 1.0 on every bar before `start` (and after
+    # `end`); folding those flat zero-return days into the daily series dilutes the annualised
+    # Sharpe by ~sqrt(total_days / in_window_days) — e.g. passing the full 1993→2026 SPY index
+    # with start=2019 understated a true 1.07 Sharpe to 0.50. We slice (and rebase) to the
+    # window so Sharpe / total_return / maxDD / exposure all describe the period actually traded.
+    eq_win = equity_series
+    if start_ts is not None or end_ts is not None:
+        m = np.ones(len(equity_series), dtype=bool)
+        if start_ts is not None:
+            m &= (equity_series.index >= start_ts)
+        if end_ts is not None:
+            m &= (equity_series.index <= end_ts)
+        if m.any():
+            eq_win = equity_series[m]
+    if len(eq_win) >= 2 and eq_win.iloc[0] != 0:
+        eq_win = eq_win / eq_win.iloc[0]          # rebase so total_return is in-window
+    daily_ret = eq_win.pct_change().fillna(0.0)
+    stats = _book_stats(ledger, eq_win, list(sleeves.keys()), cost_bps, daily_ret=daily_ret)
     return PortfolioResult(ledger=ledger, equity=equity_series, stats=stats)
 
 

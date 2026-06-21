@@ -72,16 +72,17 @@ BOOKS: dict[str, dict] = {
         "exits": {"ibs": (1.0, 3.0, 10)},      # 1-10 trading days — a true short swing
     },
     "long_swing": {
+        # Only `base`: neither breakout nor fear is breadth-gated, so a "guarded" model would be
+        # byte-identical (the breadth guard lives in the IBS sleeve, which this book doesn't run).
         "desc": "LONG-TERM SWING — weeks to ~3 months. Trend breakout + fear capitulation; "
                 "1-ATR stop, 3-ATR chandelier, ~3-month (63-day) cap.",
-        "models": {"base": {"breakout": _breakout, "fear": _fear},
-                   "guarded": {"breakout": _breakout, "fear": _fear}},
+        "models": {"base": {"breakout": _breakout, "fear": _fear}},
         "exits": {"breakout": (1.0, 3.0, 63), "fear": (1.0, 3.0, 63)},  # weeks → ~3 months
     },
     "position": {
         "desc": "POSITION / PORTFOLIO — long hold (months to years). 200-SMA trend core; "
                 "1-ATR stop, 3-ATR chandelier, multi-year (504-day) backstop.",
-        "models": {"base": {"breakout": _breakout}, "guarded": {"breakout": _breakout}},
+        "models": {"base": {"breakout": _breakout}},  # not breadth-gated → single model
         "exits": {"breakout": (1.0, 3.0, 504)},  # ride a long position to exhaustion
     },
 }
@@ -203,7 +204,12 @@ def main() -> None:
     aux = {"vix": _load("_VIX"), "vvix": _load("_VVIX"), "gld": _load("GLD"),
            "internals": load_internals()}
 
-    names = ["base", "guarded"] if args.model == "both" else [args.model]
+    requested = ["base", "guarded"] if args.model == "both" else [args.model]
+    names = [n for n in requested if n in models]
+    if not names:  # e.g. --model guarded on a book that only has `base`
+        names = list(models)[:1]
+        print(f"note: book '{args.book}' has no '{args.model}' model "
+              f"(its sleeves aren't breadth-gated); running '{names[0]}'.")
     print(f"BOOK: {args.book}  —  {book['desc']}")
     print(f"WINDOW {args.start} -> {args.end}  "
           f"(models: {', '.join(names)} | gross_cap {args.gross_cap}x | entry {args.entry_fill})")

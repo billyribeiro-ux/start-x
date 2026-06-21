@@ -12,8 +12,10 @@ The desk runs **three distinct systems, never mixed in one book** (mixing horizo
 rule is what produced the 134-bar hold inside a "swing" book). Same 1-ATR-stop / 3-ATR-chandelier
 rule everywhere; only the **max-hold clock = the horizon** differs. Get ONE right before combining.
 1. **Short-term swing** — 1–10 trading days (IBS<0.1 dip-buy). HARD 10-day cap. ← System #1, locked.
-2. **Long-term swing** — weeks to ~3 months (breakout + fear capitulation). ~63-day cap.
+2. **Long-term swing** — weeks to ~3 months (breakout + fear capitulation). 63-day cap. ← System #2,
+   locked & OOS-validated (4-agent drill: real but FRAGILE — deflated Sharpe 0.81–0.86, large-cap only).
 3. **Position / portfolio** — a long hold, months-to-years (200-SMA trend core). Multi-year backstop.
+   ← System #3, scaffolded, NOT yet calibrated (next).
 `scripts/run_book.py --book {short_swing,long_swing,position}`.
 
 ## Hard rules the user has set
