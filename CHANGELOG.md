@@ -7,6 +7,29 @@ Evidence lives in `FINDINGS.md`; the locked study window is **Jan 2019 → Jun 2
 
 ## 2026-06-21
 
+### Closed the honesty gaps (5 parallel Opus agents) — measured OOS evidence, negatives included
+The remaining "rests on assumptions" items are now hard out-of-sample numbers:
+- **Cross-instrument (thin-sample gap).** All three books on SPY/^GSPC/QQQ/IWM. The edges REPLICATE
+  across large-cap indices (SPY ≈ ^GSPC ≈ QQQ — **not single-symbol luck**) but **BREAK on small-cap
+  IWM** for all three (short_swing & long_swing go negative; position marginal) — confirms large-cap
+  only. `scripts/cross_instrument.py` + tests.
+- **Forward holdout (no-track-record gap).** A genuine paper-forward harness driven by the THREE BOOKS
+  (not the abandoned prob_up model): `forward/book_paper.py` + `scripts/forward_books.py`. On the
+  2023-26 holdout (OOS vs the 2019-22 era): short_swing Sharpe **1.13** / long_swing **1.39** /
+  position **1.15**, all net-positive; lookahead-guarded (no trade before `forward_start`). Honestly a
+  historical-holdout simulation, NOT a live-broker record.
+- **Cost realism.** `scripts/cost_sensitivity.py` + a per-instrument cost model in `backtest/costs.py`
+  (SPY=1bp). **All three books survive 20bp (10× the 2bp default); break-even >20bp.** short_swing is
+  most cost-exposed (−0.0132 Sharpe/bp) but still +22.8% at 10bp — none is cost-fragile.
+- **Walk-forward ensemble (in-sample-weights gap).** `ensemble.combine_walkforward` (trailing-window
+  weights applied forward) + `scripts/ensemble_books.py`. **NEGATIVE finding (honest):** the
+  three-book ensemble's diversification lift INVERTS out-of-sample (in-sample +0.18 Sharpe → walk-
+  forward **−0.18 to −0.48** across 12-36mo lookbacks) — the books are too correlated (all
+  long-SPY-ish); you're better off holding the single best book. The in-sample lift was a weight-
+  fitting mirage. (Distinct from the DECODE.md book+ML-ranker ensemble, whose value rests on the
+  ~0-correlation ML sleeve — not re-tested here.)
+- _Walk-forward PARAMETER selection (5th agent) lands next — committed when verified._
+
 ### Built — System #3: position book (`strategy/trend_position.py`)
 - **The third book is live: a 200-SMA ±3% hysteresis-band trend core**, long-above / flat-below, its
   OWN engine (a continuous regime allocation, NOT the discrete chandelier path). The "stop" is the
