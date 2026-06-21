@@ -133,8 +133,12 @@ class HMMRegimeDetector:
         """
         model = self.model
         n_obs = matrix.shape[0]
-        log_startprob = np.log(model.startprob_)
-        log_transmat = np.log(model.transmat_)
+        # log(0) = -inf is the intended, correct value for a zero start/transition
+        # probability; logsumexp handles -inf downstream, so silence the expected
+        # divide-by-zero rather than perturb the probabilities with a floor.
+        with np.errstate(divide="ignore"):
+            log_startprob = np.log(model.startprob_)
+            log_transmat = np.log(model.transmat_)
         # Per-observation emission log-likelihoods b_j(o_t): shape (n_obs, n_states).
         framelogprob: NDArray[np.float64] = model._compute_log_likelihood(matrix)
 
