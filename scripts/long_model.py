@@ -53,14 +53,25 @@ def _ibs(s, a):
     return ibs_signals(s)
 
 
-def _portfolio_stream(spy, aux, sleeves, exits, start, end, gross_cap):
-    """Run a chandelier book and return its in-window daily return stream + headline stats."""
-    res = run_portfolio(spy, aux, sleeves, exits=exits, gross_cap=gross_cap, start=start, end=end)
+def _portfolio_stream(spy, aux, sleeves, exits, warmup_start, end, gross_cap):
+    """Run a chandelier book and return its daily return stream over [warmup_start, end].
+
+    Entries are allowed from ``warmup_start`` so the vol-target overlay (and any open position)
+    is warm by the time the REPORTING window opens — the caller slices the result to [start, end].
+    """
+    res = run_portfolio(spy, aux, sleeves, exits=exits, gross_cap=gross_cap,
+                        start=warmup_start, end=end)
     eq = res.equity
-    m = (eq.index >= pd.Timestamp(start)) & (eq.index <= pd.Timestamp(end))
+    m = (eq.index >= pd.Timestamp(warmup_start)) & (eq.index <= pd.Timestamp(end))
     eq = eq[m]
     eq = eq / eq.iloc[0]
-    return eq.pct_change().fillna(0.0), res.stats
+    return eq.pct_change().fillna(0.0)
+
+
+def _slice(r: pd.Series, start, end) -> pd.Series:
+    """Slice a daily return stream to the reporting window [start, end]."""
+    m = (r.index >= pd.Timestamp(start)) & (r.index <= pd.Timestamp(end))
+    return r[m]
 
 
 def _stream_stats(r: pd.Series) -> dict:
@@ -87,31 +98,46 @@ def main() -> None:
     ap.add_argument("--lev-cap", type=float, default=3.0, dest="lev_cap")
     ap.add_argument("--vol-window", type=int, default=63, dest="vol_window")
     ap.add_argument("--gross-cap", type=float, default=1.5, dest="gross_cap")
+    ap.add_argument("--warmup-days", type=int, default=400, dest="warmup_days",
+                    help="calendar days of pre-window warm-up so vol-targeting is warm at start")
     args = ap.parse_args()
 
     spy = _load("SPY"); spy.attrs["symbol"] = "SPY"
     aux = {"vix": _load("_VIX"), "vvix": _load("_VVIX"), "gld": _load("GLD"),
            "internals": load_internals()}
 
-    # --- the three book daily return streams over the study window ----------------------------
-    short_r, short_s = _portfolio_stream(
-        spy, aux, {"ibs": _ibs}, {"ibs": (1.0, 3.0, 10)}, args.start, args.end, args.gross_cap)
-    long_r, long_s = _portfolio_stream(
+    # --- book return streams over [warmup_start, end]; sliced to [start, end] for reporting ----
+    warmup_start = (pd.Timestamp(args.start) - pd.Timedelta(days=args.warmup_days)).strftime("%Y-%m-%d")
+    short_buf = _portfolio_stream(
+        spy, aux, {"ibs": _ibs}, {"ibs": (1.0, 3.0, 10)}, warmup_start, args.end, args.gross_cap)
+    long_buf = _portfolio_stream(
         spy, aux, {"breakout": _breakout, "fear": _fear},
-        {"breakout": (1.0, 3.0, 63), "fear": (1.0, 3.0, 63)}, args.start, args.end, args.gross_cap)
-    pos_res = position_book(spy, start=args.start, end=args.end)
-    pos_r = pos_res.equity.pct_change().fillna(0.0)
+        {"breakout": (1.0, 3.0, 63), "fear": (1.0, 3.0, 63)}, warmup_start, args.end, args.gross_cap)
+    pos_buf = position_book(spy, start=warmup_start, end=args.end).equity.pct_change().fillna(0.0)
 
+    # the better long model = the two SWING books (position EXCLUDED, see below); built on the
+    # buffered streams so the overlay is warm, then sliced to the reporting window.
+    swing = {"short_swing": short_buf, "long_swing": long_buf}
+    model_buf = vol_target_risk_parity(swing, vol_window=args.vol_window,
+                                       target_vol=args.target_vol, lev_cap=args.lev_cap)
+    three_buf = vol_target_risk_parity({**swing, "position": pos_buf}, vol_window=args.vol_window,
+                                       target_vol=args.target_vol, lev_cap=args.lev_cap)
+
+    # --- slice everything to the REPORTING window [start, end] --------------------------------
+    short_r = _slice(short_buf, args.start, args.end)
+    long_r = _slice(long_buf, args.start, args.end)
+    pos_r = _slice(pos_buf, args.start, args.end)
+    model_combined = _slice(model_buf.combined, args.start, args.end)
+    model_lev = _slice(model_buf.leverage, args.start, args.end)
     singles = {"short_swing": _stream_stats(short_r), "long_swing": _stream_stats(long_r),
                "position": _stream_stats(pos_r)}
 
-    # --- the better long model = the two SWING books (position is EXCLUDED, see below) --------
-    swing = {"short_swing": short_r, "long_swing": long_r}
-    model = vol_target_risk_parity(swing, vol_window=args.vol_window,
-                                   target_vol=args.target_vol, lev_cap=args.lev_cap)
-    # the three-book variant, kept only to SHOW why position is excluded (it drags Sharpe down)
-    three = vol_target_risk_parity({**swing, "position": pos_r}, vol_window=args.vol_window,
-                                   target_vol=args.target_vol, lev_cap=args.lev_cap)
+    from startx.validation.metrics import deflated_sharpe
+    class _M:  # tiny shim so the print block below reads the same as before
+        stats = _stream_stats(model_combined); leverage = model_lev
+    model = _M()
+    model.stats["deflated_sharpe"] = float(deflated_sharpe(model_combined.dropna(), n_trials=27))
+    three = _M(); three.stats = _stream_stats(_slice(three_buf.combined, args.start, args.end))
 
     print("BETTER LONG MODEL — vol-targeted risk-parity across the TWO SWING books")
     print(f"WINDOW {args.start} -> {args.end}  "
