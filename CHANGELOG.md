@@ -5,6 +5,28 @@ Discipline throughout: **out-of-sample** robustness (TRAIN 2019-22 / TEST 2023-2
 drift-adjusted alpha, deflated Sharpe, brutal honesty about multiple testing and small samples.
 Evidence lives in `FINDINGS.md`; the locked study window is **Jan 2019 → Jun 2026** (`CLAUDE.md`).
 
+## 2026-06-26
+
+### The "better long model" — vol-targeted risk-parity across the two SWING books (built + reproduced)
+New `portfolio/long_model.py` (`vol_target_risk_parity`) + runner `scripts/long_model.py` + tests
+(`tests/test_long_model.py`, 5). Rule: weight the books by inverse trailing-63d vol (RISK PARITY),
+then scale the blend to a 10% annual vol target, leverage-capped 3×, daily — all `.shift(1)`-lagged
+(no lookahead). I did NOT take the build-off's asserted "Sharpe 1.24" on faith; I rebuilt the streams
+and **measured** it. The honest, reproduced result (2019-26, gross_cap 1.5×):
+- **Lifts the best single book (long_swing) from Sharpe 1.07 / CAGR 8.8% → Sharpe 1.22 / CAGR 13.5%**
+  (lift +0.16), maxDD −14.8%, Calmar 0.91 (vs 0.87), DSR 0.90. Robust: holds in BOTH halves
+  (2019-22 0.75→0.92, 2023-26 1.39→1.59) and 32/36 of a (target_vol × lev_cap × vol_window) grid.
+- **CORRECTION to the build-off claim — only the TWO SWING books belong in the blend, not three.**
+  Folding in System #3 (position) DRAGS it to Sharpe **0.98 — below the best single book** — because
+  in a bull window the position core is correlated dead weight (corr 0.59 w/ long_swing, maxDD −22%);
+  its drawdown-defense value lives in a bear tail 2019-26 doesn't contain. Position stays its OWN
+  benchmarked book, OUT of the active blend.
+- **Honesty caveat (kept in the docstring):** the lift needs the vol-target overlay — the *un-levered*
+  static blend alone is Sharpe ~1.02 (≤ long-only 1.07) — and runs ~2.2× mean leverage, so absolute
+  drawdown is DEEPER than long_swing alone (−14.8% vs −10.1%) even as Sharpe/Calmar improve. It is
+  risk-adjusted-better, not free. Inverse-vol RP barely beats naive equal-weight (1.22 vs 1.23), so
+  the edge is diversification + vol-targeting, NOT a finely-tuned weighting scheme.
+
 ## 2026-06-21
 
 ### Short-the-index engine + study (3 parallel Opus agents) — verdict: NO deployable short edge

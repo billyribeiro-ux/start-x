@@ -125,6 +125,29 @@ Sharpe 0.81–0.86 — clears the 0.70 "fragile" floor but **below the 0.95 "REA
 
 ---
 
+## The "better long model" — vol-targeted risk-parity across the two SWING books (`portfolio/long_model.py`)
+
+A meta-allocation that COMBINES the books rather than a new sleeve. Rule: weight the books by
+**inverse trailing-63d vol (risk parity)**, then scale the blend to a **10% annual vol target**
+(trailing-63d estimate), **leverage cap 3×**, rebalanced daily — every weight/leverage `.shift(1)`-
+lagged (no lookahead). Run `python scripts/long_model.py` (prints the head-to-head + the 3-book
+variant so the choice is auditable).
+
+- **Result (2019-26, measured not asserted):** lifts the best single book (long_swing) from
+  **Sharpe 1.07 / CAGR 8.8% → Sharpe 1.22 / CAGR 13.5%** (lift +0.16), maxDD −14.8%, Calmar 0.91,
+  **DSR 0.90**. Robust in BOTH halves (2019-22 0.75→0.92, 2023-26 1.39→1.59) and 32/36 of a param grid.
+- **Only the TWO SWING books go in the blend (short_swing + long_swing) — NOT three.** Folding in the
+  position core DRAGS it to Sharpe **0.98**, BELOW the best single book: in a bull window it is
+  correlated dead weight (corr 0.59 w/ long_swing, −22% maxDD); its drawdown-defense value is in a
+  bear tail 2019-26 doesn't contain. Position stays its own benchmarked book, OUT of this blend.
+- **Honest caveats.** The lift needs the vol-target overlay (the *un-levered* static blend alone is
+  ~1.02, ≤ long-only 1.07) and runs **~2.2× mean leverage**, so absolute drawdown is DEEPER than
+  long_swing alone (−14.8% vs −10.1%) even as Sharpe/Calmar improve — risk-adjusted-better, not free.
+  Inverse-vol RP barely beats naive equal-weight (1.22 vs 1.23): the edge is diversification +
+  vol-targeting, NOT a clever weighting scheme.
+
+---
+
 ## Portfolio engine — sizing, overlays, hygiene
 
 - **Concurrent, vol-targeted sizing.** Each position is sized so its risk ≈ **3% of equity** (sized
@@ -154,6 +177,12 @@ python scripts/run_book.py --book short_swing --start 2019-01-01 --end 2026-06-1
 
 # System #2 — long-term swing (weeks to ~3 months)
 python scripts/run_book.py --book long_swing --start 2019-01-01 --end 2026-06-19 --stress --out l.csv
+
+# System #3 — position core vs SPY buy-and-hold
+python scripts/run_book.py --book position --start 2019-01-01 --end 2026-06-19
+
+# The "better long model" — vol-targeted risk-parity across the two swing books
+python scripts/long_model.py --start 2019-01-01 --end 2026-06-18
 ```
 Writes one CSV per model plus `<out>_all.csv` (every trade tagged by `model`), each ending with the
 locked totals block (TOTAL WIN $ / TOTAL LOSS $ / NET TOTAL $) and per-share P&L. Prints the

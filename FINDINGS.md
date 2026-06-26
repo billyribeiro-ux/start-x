@@ -171,3 +171,18 @@ Four specialist agents independently stress-tested the book. They converge hard:
   reduction, not raw return**; SPY's nominal lead is pure bull beta the book declines to take.
   Leverage is Sharpe-neutral and just amplifies — **1.5× is the Calmar sweet spot, 3× unjustified.**
 - **R-multiple:** expectancy +1.1 to +1.3 R/trade (lose ~1R, win ~3.4R, ~50% win).
+
+## The "better long model" — combining the books (build-off, then MEASURED reproduction, 2019-26)
+- **Combining the two SWING books beats the best single book — but you must MEASURE it, not assert.**
+  A 3-agent build-off proposed several combiners; the only survivor is vol-targeted **risk parity**
+  (inverse-trailing-63d-vol weights → 10% vol target, cap 3×, daily, all `.shift(1)`-lagged). On the
+  re-built streams it lifts long_swing from **Sharpe 1.07 / 8.8% CAGR → 1.22 / 13.5%** (lift +0.16),
+  Calmar 0.91, **DSR 0.90**, robust in both halves (0.75→0.92, 1.39→1.59) and 32/36 of a param grid.
+- **The build-off's "1.24 across THREE books" did NOT reproduce — three books gives 0.98.** Folding
+  System #3 (position) into the blend DRAGS Sharpe BELOW the best single book: in a bull window it's
+  correlated dead weight (corr 0.59, −22% maxDD); its value is the bear tail 2019-26 lacks. Lesson
+  reaffirmed: **reproduce an agent's headline number from the raw streams before trusting it.**
+- **The lift is diversification + vol-targeting, NOT a clever weighting and NOT free leverage.**
+  Inverse-vol RP barely beats naive equal-weight (1.22 vs 1.23); the *un-levered* static blend alone
+  is ~1.02 (≤ long-only 1.07), so the overlay does the work — at ~2.2× mean leverage, which deepens
+  absolute drawdown (−14.8% vs −10.1%). Risk-adjusted-better, not free. (`portfolio/long_model.py`.)
