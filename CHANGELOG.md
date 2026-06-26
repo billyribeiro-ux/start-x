@@ -7,6 +7,24 @@ Evidence lives in `FINDINGS.md`; the locked study window is **Jan 2019 → Jun 2
 
 ## 2026-06-21
 
+### Short-the-index engine + study (3 parallel Opus agents) — verdict: NO deployable short edge
+Built `strategy/short_engine.py` (mirror chandelier exit: sell at signal, 1-ATR stop ABOVE, 3-ATR
+trailing cover BELOW, gap-aware, one-at-a-time, bear-regime gated). A 3-agent study (overbought /
+trend-breakdown / breadth-stress) on SPY/^GSPC/QQQ/IWM + deep history, drift-adjusted short edge +
+realistic short P&L:
+- **Shorting the index is structurally a losing game.** The +0.4%/10d drift is a permanent headwind;
+  forward drift stays POSITIVE even below the 200-SMA (and *violently* positive in the bear-market
+  rallies). Of 475 trigger×window×horizon cells only **7%** show negative conditional drift — and even
+  those LOSE as actual shorts (the 1-ATR stop is run over by counter-trend bounces).
+- "Fade the rally" (overbought in an uptrend) = uniformly negative-edge; "sell the breakdown" trend
+  shorts = no OOS edge (nothing clears t=1); low-VIX / breadth-washout = LONG signals, not shorts.
+- **Only survivor:** `overbought_short` (RSI2>90 & below 200-SMA — sell the overbought *bounce* in a
+  bear): full-history PF ~1.1-1.4 (SPY one-at-a-time win 43%) but **LOSES in bulls** (2019-26 PF 0.44)
+  and concentrates P&L in 2000-09. Thin, fragile, NOT alpha — shipped as a confirmed-downtrend
+  drawdown HEDGE only. `tests/test_short_engine.py` (4).
+- Confirms the desk prior: **LONG edges dominate; the upward drift makes the index un-shortable as a
+  standalone edge.**
+
 ### Re-investigated the mean-reversion entry on the recent window (3 parallel Opus agents) — RE-VALIDATED
 User shortened the study window to Jan 2025→Jun 2026 and distrusted RSI-2. A fresh end-to-end re-test
 (RSI-2 verdict / IBS threshold recalibration / broaden-the-search), measuring **drift-adjusted alpha**
