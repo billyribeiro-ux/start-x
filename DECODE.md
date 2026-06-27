@@ -19,6 +19,12 @@ what runs over a short). Net of ~2bp + realistic borrow. TRAIN 2018-22 / TEST 20
 | **B — single-name breakdown** | breakdown/failed-rally/rel-weak/lower-high, 10 variants, 312k trades | **−1.7 to −6.1** (every variant) | 0.00 | — | ❌ | ~30% win — short the break, it bounces, 1-ATR stop runs over. Best variant +0.26% in TRAIN → −0.55% TEST (overfit). |
 | **C — negative event-drift** | down-gap ≤−5% on ≥1.5× vol, weak close; mirror of Reaction-PEAD | drift fwd5 −0.32% → fwd20 **+1.10%** (INVERTS) | — | — | ❌ | down-gaps *recover*; no downside continuation. Tiny 5d dip < cost. Opposite of a PEAD-short signature. |
 | **D — regime gate** | short worst-decile conditional on 18 bear/breadth/vol/credit flags | **negative in EVERY flag**, TRAIN and TEST | — | — | ❌ | NO regime (below-200, death-cross, weak-breadth, vol-stress) flips shorting positive. Even deep-bear gates lose. |
+| **E — overbought MIRROR** | short the OVERBOUGHT (IBS≥.9, RSI2≥95/98, ext20/50, BB-upper, blow-off gap), 8 setups × 3 trends, 1.89M signals | fwd ret **POSITIVE everywhere** (overbought keeps rising) | — | — | ❌ | the symmetric twin of the long edge: over-extended names DON'T revert down, they MOMENTUM up; blow-off gap-ups in a downtrend forward **+20%** (short squeezes). |
+
+**The keystone insight (why NO short works):** single-name equities are **long-biased at BOTH tails** — oversold
+names revert UP (bounce; this powers our long IBS dip-buy AND kills every weakness-short A/B/C/D), and overbought
+names continue UP (momentum; this kills the overbought-mirror E). There is no extreme from which price reliably
+falls. Shorting loses at every percentile. That is the decode, and it is symmetric and complete.
 
 **The decoded answer (firewall-grade):** *there is no standalone single-name SHORT alpha in this universe.* Six
 independent tests now agree (these 4 + the two prior index studies). The short side has value ONLY in two roles, both
@@ -27,7 +33,8 @@ the short; the short leg is the diversifier/hedge, never standalone), and (2) a 
 (`overbought_short` — sized small, judged OOS, not alpha). **The qedge scanner correctly returns "LIKELY OVERFIT" for
 single-name shorts — that is the firewall working, not a bug.** A standalone short scanner is the wrong instrument;
 the right one is the market-neutral ranker's short leg. Scripts: `scripts/short_xsec.py` (A), `scripts/short_regime_gate.py` (D);
-B/C harnesses in the decode scratchpad. n_trials honestly counted (A=28, B=10, D=18) so DSR isn't flattered.
+B/C harnesses in the decode scratchpad; `scripts/short_overbought_study.py` (E, the mirror) and
+`scripts/short_scan_study.py` (B+C reproducers). n_trials honestly counted (A=28, B=10, D=18, E=24) so DSR isn't flattered.
 
 ---
 
