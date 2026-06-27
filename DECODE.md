@@ -5,6 +5,32 @@ The firewall (out-of-sample, deflated Sharpe, PBO, leakage/shuffle canary) decid
 
 ---
 
+## SHORT-SCANNER campaign — 4 parallel angles (cross-section / breakdown / event-drift / regime) → VERDICT: NO standalone short alpha
+
+**The question:** the index is un-shortable (upward drift). Does a real, firewall-cleared SHORT edge exist in the
+**single-name universe** (~1,186 names incl. delisted)? Four agents attacked it in parallel; I reproduced every
+verdict from their artifacts. **All four fail the firewall — and fail for the SAME structural reason: weak /
+breaking-down / gapping-down names BOUNCE** (the oversold mean-reversion that powers our *long* IBS edge is exactly
+what runs over a short). Net of ~2bp + realistic borrow. TRAIN 2018-22 / TEST 2023→2026-06-25.
+
+| Angle | Method | OOS (2023→now) short Sharpe, net | DSR | PBO | Gate | Cause of death |
+|---|---|---|---|---|---|---|
+| **A — cross-sectional short leg** | short worst-decile by momentum/RS/trend, 28 configs | **−0.78** (short-only); mkt-neutral +0.35 | 0.000 / 0.082 | 0.67 / 0.00 | ❌ | weakest decile *outperforms*; short leg is pure −1.3 beta. Borrow break-even at **−18.7%/yr** (hopeless). Mkt-neutral "+" is the LONG leg. |
+| **B — single-name breakdown** | breakdown/failed-rally/rel-weak/lower-high, 10 variants, 312k trades | **−1.7 to −6.1** (every variant) | 0.00 | — | ❌ | ~30% win — short the break, it bounces, 1-ATR stop runs over. Best variant +0.26% in TRAIN → −0.55% TEST (overfit). |
+| **C — negative event-drift** | down-gap ≤−5% on ≥1.5× vol, weak close; mirror of Reaction-PEAD | drift fwd5 −0.32% → fwd20 **+1.10%** (INVERTS) | — | — | ❌ | down-gaps *recover*; no downside continuation. Tiny 5d dip < cost. Opposite of a PEAD-short signature. |
+| **D — regime gate** | short worst-decile conditional on 18 bear/breadth/vol/credit flags | **negative in EVERY flag**, TRAIN and TEST | — | — | ❌ | NO regime (below-200, death-cross, weak-breadth, vol-stress) flips shorting positive. Even deep-bear gates lose. |
+
+**The decoded answer (firewall-grade):** *there is no standalone single-name SHORT alpha in this universe.* Six
+independent tests now agree (these 4 + the two prior index studies). The short side has value ONLY in two roles, both
+already logged: (1) the **short leg of a market-neutral book** (the ML ranker, Sharpe ~0.87 — the long leg finances
+the short; the short leg is the diversifier/hedge, never standalone), and (2) a **small −beta drawdown HEDGE**
+(`overbought_short` — sized small, judged OOS, not alpha). **The qedge scanner correctly returns "LIKELY OVERFIT" for
+single-name shorts — that is the firewall working, not a bug.** A standalone short scanner is the wrong instrument;
+the right one is the market-neutral ranker's short leg. Scripts: `scripts/short_xsec.py` (A), `scripts/short_regime_gate.py` (D);
+B/C harnesses in the decode scratchpad. n_trials honestly counted (A=28, B=10, D=18) so DSR isn't flattered.
+
+---
+
 ## CONSOLIDATED SCOREBOARD (all edges characterized, gathered before assembly)
 
 **The shape of the answer: there is no single oracle. There is a constellation of small, real,
