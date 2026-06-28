@@ -20,6 +20,10 @@ from .signals import FEATURES, _atr
 
 STRESS = ["risk_off", "crisis"]
 PROB_CUTOFF = 0.50              # the promoted rule's pre-registered cutoff
+STOP_ATR_MULT = 2.0            # validated exit (swing_improve STUDY A): 2-ATR stop beats the tight 1-ATR
+                              # one — Calmar 0.35->0.67, Sharpe 1.06->1.63 (DSR 1.00, N=7). The 1-ATR stop
+                              # was cutting the mean-reversion bounce short. Caveat: tuned to V-shaped
+                              # 2018-26 recoveries; a tight stop is safer in a sustained bear.
 
 
 @dataclass
@@ -105,7 +109,7 @@ def surface(sm: ScanModel, prices_by_sym: dict, reg: pd.DataFrame, *, asof=None,
                 jj = int(j[0])
                 entry = float(p["open"].iloc[jj]) if jj < len(p) else float("nan")
                 atrv = float(_atr(p).iloc[jj - 1]) if jj >= 1 else float("nan")
-                inval = entry - 1.0 * atrv                       # the 1-ATR stop = invalidation
+                inval = entry - STOP_ATR_MULT * atrv             # validated 2-ATR stop = invalidation
         drivers = []
         if contrib is not None:
             c = contrib[ii][:-1]

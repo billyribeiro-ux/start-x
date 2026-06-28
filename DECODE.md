@@ -97,6 +97,14 @@ B/C harnesses in the decode scratchpad; `scripts/short_overbought_study.py` (E, 
 > the 1-ATR stop; worst trigger = pullback 57%). The self-learning layer is wired into the live scanner but
 > correctly holds **0 avoid rules** — and that null result is the deliverable: it blocks a plausible-but-wrong
 > filter that looked great in-sample (higher loss *rate*) but cut returns OOS. See LEDGER R5 + SELFLEARN_LOG.md.
+>
+> ✅ **IMPROVEMENT FOUND (R6, 2026-06-28) — the EXIT, not the entry filter.** R5's diagnosis (losers bleed
+> through the tight 1-ATR stop) led to a firewall-cleared win: re-simulating the SAME entries under a 2-ATR
+> stop (vs 1-ATR), DSR-deflated over a 7-policy grid, lifts the investable swing book **Sharpe 1.06->1.63,
+> Calmar 0.35->0.67, CAGR 9.7%->22.1%** (win% 48->65; maxDD -27.9->-33.0%). The tight stop was cutting the
+> mean-reversion bounce short. Wired into the scanner (`scan.STOP_ATR_MULT=2.0`). Caveat: favoured by the
+> 2018-26 V-shaped recoveries; a tight stop is safer in a sustained bear. Conviction-SIZING was null
+> (equal-weight >= any learned weight — single-trade magnitude isn't predictable). `scripts/swing_improve.py`.
 
 **The shape of the answer (original Round-1 framing, now superseded by the box above): a constellation of
 small weakly-correlated edges — but the survivorship + investability audits collapsed most of them.**

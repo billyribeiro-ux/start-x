@@ -64,7 +64,7 @@ def _card(s):
     flag = "  ⛔AVOIDED" if s.vetoed else ""
     print(f"  {s.symbol:5} {str(s.date.date())}  {s.direction.upper():5} [{s.regime}]  trigger={s.trigger}{flag}")
     print(f"        conviction(calibrated) {s.conviction:.0%}  |  entry~{s.entry_ref:.2f}  "
-          f"invalidation {s.invalidation:.2f}")
+          f"invalidation {s.invalidation:.2f} (2-ATR stop, ~10d hold)")
     print(f"        drivers: {drv}")
     print(f"        regime-cohort: exp {s.cohort_exp*100:+.2f}%  CVaR5% {s.cohort_cvar5*100:.2f}%  (n={s.cohort_n})")
     if s.vetoed:

@@ -26,3 +26,7 @@
 - candidates exhausted; avoid set converged.
 - ML loss-veto (walk-forward, veto_q=0.85, same scored subset): exp +1.21% -> +1.04%, DSR 0.85 -> 0.60 (vetoed cohort exp +2.22% — the 'avoid' trades were PROFITABLE).
 - standing avoid set: 0 rule(s); holdout-equivalent exp +0.95% -> +0.95%.
+
+## Improvement studies — 2026-06-28
+- STUDY A (exits, grid N=7): PROMOTE exit 'wider stop 2.0/2.0': book Sharpe +1.06->+1.63, maxDD -27.9%->-33.0%, DSR 0.97->1.00.
+- STUDY B (sizing): conviction sizing did not improve the calendar book on risk-adjusted terms.

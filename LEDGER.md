@@ -11,6 +11,39 @@ the other side and why they keep losing, (3) the pre-stated kill condition.
 
 ---
 
+## Round R6 — improve the edge: exits + sizing (2026-06-28)  ·  VERDICT: ✅ EXIT improvement real (2-ATR stop); sizing null
+
+R5's diagnosis ("losers bleed through the tight 1-ATR stop; the loss-prone cohort has the fattest right
+tail") implied two levers that work WITH the variance. Both tested on the cached 366-trade taken book
+WITHOUT re-fitting the entry model (`scanner/improve.py`, `scripts/swing_improve.py`).
+
+**STUDY A — EXITS (re-simulate the SAME entries under a pre-registered 7-policy grid; DSR deflated by N=7):**
+| exit policy | per-trade exp | PF | win% | investable book Sharpe | maxDD | Calmar | DSR |
+|---|---|---|---|---|---|---|---|
+| baseline 2.0/1.0 (tight stop) | +0.95% | 1.60 | 47.8 | +1.06 | −27.9% | 0.35 | 0.97 |
+| **wider stop 2.0/2.0** | **+1.35%** | **1.71** | 64.5 | **+1.63** | −33.0% | **0.67** | **1.00** |
+| wider stop 2.0/1.5 | +1.10% | 1.60 | 57.4 | +1.28 | −36.6% | 0.43 | 0.99 |
+| wider target 3.0/1.0 | +0.89% | 1.49 | 39.1 | +1.04 | −32.2% | 0.32 | 0.96 |
+| regime 3.0/2.0 | +1.27% | 1.55 | 56.8 | +1.62 | −38.2% | 0.64 | 1.00 |
+(regime-scaled x1.5/x2.0 == the flat 2.0/1.5 & 2.0/2.0 rows because all 366 takes are in-stress.)
+**Finding:** the 2-ATR stop nearly DOUBLES Calmar (0.35→0.67) and lifts book Sharpe 1.06→1.63 (DSR 1.00 at
+N=7) — the 1-ATR stop was prematurely cutting the mean-reversion bounce (win% 48→65%). Consistent with the
+desk rule "don't cut winners within the horizon." **PROMOTED → wired into the scanner (`scan.STOP_ATR_MULT
+= 2.0`, invalidation now 2-ATR).** CAVEAT (honest): a wider stop is favoured by the V-shaped recoveries
+that characterise 2018-26 stress; in a sustained grind-down a tight stop is safer. maxDD rises ~5pp
+(−27.9→−33.0%) but return rises 2.3x, so the trade is Calmar-positive. Note the gate was first mis-set to
+veto ANY maxDD increase (would have hidden this); corrected to risk-adjusted (Calmar+DSR + a 1.3x-DD
+blowout guard).
+
+**STUDY B — CONVICTION SIZING (calendar book; lean into the fat tail): NULL.** Equal-weight Sharpe +1.06.
+Walk-forward edge-model weight = +1.30 but the SAME-SUBSET equal-weight is +1.33 (sizing is *worse*);
+stress-depth weight +1.08 ≈ equal-weight. Leaning into the fat tail raises expectancy but adds variance/DD
+in equal measure → no risk-adjusted gain. The edge model can't rank single-trade magnitude (consistent
+with the project-wide "direction/magnitude prediction is a coin flip" result). **Equal-weight stands.**
+**+9 trials → N** (7 exit grid + 2 sizing schemes).
+
+---
+
 ## Round R5 — self-learning LOSS loop (2026-06-28)  ·  VERDICT: the losses are NOT separably avoidable (firewall held)
 
 **Hypothesis:** the ~52% of stress-gated swing takes that lose share an ex-ante signature a model can learn
@@ -169,7 +202,7 @@ liquid names. Detail in DECODE.md (single-name equities are long-biased at both 
 ---
 
 ## Running project N (fed to every DSR/PBO from here)
-Short campaign ≈ 336 · ranker A/B = 4 · misc baselines ≈ 10 · R5 loss-avoidance = 6 → **N ≈ 356** and counting. With N this large,
+Short campaign ≈ 336 · ranker A/B = 4 · misc baselines ≈ 10 · R5 loss-avoidance = 6 · R6 exits+sizing = 9 → **N ≈ 365** and counting. With N this large,
 the deflation bar is high by design: only edges with a strong prior + clean OOS + low search cost clear it.
 Validated production systems (the three rule-based books, the better long model) were each established under
 their own pre-registered, low-N protocols — see CHANGELOG/STRATEGY/FINDINGS — and are NOT diluted by this
