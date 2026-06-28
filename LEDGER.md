@@ -43,6 +43,21 @@ Scripts: scripts/swing_validate.py.
 - VERDICT: a real, economically strong, regime-conditional swing edge — the best found — but threshold-
   selection-fragile; honest status = promising-not-yet-stamped. Next: pre-commit threshold + touch-once holdout.
 
+**P5 touch-once HOLDOUT (scripts/swing_holdout.py) — ✅ FIRST PROMOTED SIGNAL.** Removing the threshold
+SEARCH (the cause of PBO 0.76) and pre-registering the rule fixed it. DEV 2012-19 (eyeball) / HOLDOUT
+2020-26 (touched once, no search):
+| rule | HOLDOUT n | exp/trade | PF | Sharpe | DSR(N=2) |
+|---|---|---|---|---|---|
+| stress raw (all events) | 347 | +0.41% | 1.37 | 0.68 | 0.98 |
+| **stress + prob>=0.5** | 88 | **+0.68%** | 1.71 | 1.17 | 0.96 |
+Skeptic checks on the promoted rule: DSR vs N = 0.96(2)/0.78(8)/0.66(16)/0.55(30)/0.46(50) — survives
+honest deflation to N~30, THIN beyond. **BETA CHECK (decisive): SPY fwd-10d on the same entries = −0.35%
+(tape falling) while the strategy makes +0.68% -> beta 0.12, ALPHA +0.73%/trade.** Real timing/selection
+alpha, NOT bounce-beta. Charter promotion gate (DSR>0, no-search-so-PBO-n/a, OOS exp>0, regime-conditional
++ alpha shown) -> **PROMOTE small + monitor decay.** First genuinely promotable signal in the project;
+honest status = real, regime-conditional swing alpha, THIN — size accordingly. (Caveat: 2020-26 was partly
+observed in prior exploration, so the conservative-N DSR ~0.55-0.66 is the fair read, not the N=2 0.96.)
+
 ## Round R3 — cross-sectional ML ranker (2026-06-26)  ·  VERDICT: MIRAGE (survivorship)
 
 **Hypothesis:** weak cross-sectional predictability (momentum/reversal/illiquidity) lets a market-neutral
