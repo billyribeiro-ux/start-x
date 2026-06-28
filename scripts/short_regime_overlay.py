@@ -75,7 +75,7 @@ def main():
     short = (-ret) * bear.astype(float) - entry.astype(float) * COST_RT
 
     print(f"REGIME-CONDITIONAL SHORT OVERLAY — {args.sym}  {c.index.min().date()}..{c.index.max().date()}")
-    print(f"(bear = close < 200-SMA; short the index on bear days, flat in bull)\n")
+    print("(bear = close < 200-SMA; short the index on bear days, flat in bull)\n")
 
     print("=== short stream SPLIT BY REGIME (this is the 'both ways' picture) ===")
     sret = -ret
