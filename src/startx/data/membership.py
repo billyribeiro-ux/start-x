@@ -36,6 +36,17 @@ import pandas as pd
 _CUR_CACHE = "data/cache/sp500_current.parquet"
 _CHG_CACHE = "data/cache/sp500_changes.parquet"
 
+# The local price cache effectively starts ~2010 and only reaches >=95% cross-section coverage from
+# ~2016; the reportable real-data window is 2018+. A cross-sectional study run BEFORE this silently
+# re-injects survivorship (the missing names are the delisted ones), which produces FAKE results.
+# ``require_coverage`` turns that recurring mistake into a hard, loud failure.
+REAL_DATA_START = pd.Timestamp("2016-01-01")     # earliest date the cache supports a clean cross-section
+REPORT_START = pd.Timestamp("2018-01-01")        # the locked real-data reporting window start
+
+
+class CoverageError(RuntimeError):
+    """Raised when a requested window's universe coverage is too low to be survivorship-free."""
+
 
 def _parse_date(s: object) -> pd.Timestamp:
     """Parse FMP's mixed date formats ('2008-09-15' or 'September 15, 2008'); NaT on failure."""
@@ -106,6 +117,27 @@ class SP500Membership:
             rows.append({"date": pd.Timestamp(d), "n_members": len(mem),
                          "n_with_prices": len(mem & av), "coverage": len(mem & av) / max(len(mem), 1)})
         return pd.DataFrame(rows)
+
+    def require_coverage(self, available, dates, *, min_cov: float = 0.95) -> pd.DataFrame:
+        """Refuse to proceed if any rebalance date's universe coverage is below ``min_cov``.
+
+        This is the survivorship guard: the local price cache cannot support a clean cross-section
+        before ~2016 (delisted names are missing pre-2013), so a study reaching back further silently
+        re-injects survivorship and produces fake results. Call this BEFORE building any cross-sectional
+        panel; it raises :class:`CoverageError` (loud, with the worst offending date) rather than let a
+        contaminated backtest run. Returns the coverage report on success.
+        """
+        rep = self.coverage_report(available, dates)
+        bad = rep[rep["coverage"] < min_cov]
+        if len(bad):
+            worst = bad.sort_values("coverage").iloc[0]
+            raise CoverageError(
+                f"survivorship guard tripped: {len(bad)}/{len(rep)} rebalance dates below "
+                f"{min_cov:.0%} universe coverage (worst {worst['date'].date()} = {worst['coverage']:.0%}). "
+                f"The price cache can't support a survivorship-free cross-section before ~{REAL_DATA_START.date()}; "
+                f"restrict the study to the real-data window (>= {REAL_DATA_START.date()}, report >= "
+                f"{REPORT_START.date()}). Refusing to produce contaminated (fake) results.")
+        return rep
 
     def sector(self, symbol: str) -> str | None:
         return self.sectors.get(symbol)

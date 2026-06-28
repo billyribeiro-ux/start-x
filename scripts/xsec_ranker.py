@@ -32,7 +32,11 @@ warnings.filterwarnings("ignore")
 import numpy as np
 import pandas as pd
 
-from startx.data.membership import SP500Membership
+from startx.data.membership import (
+    REAL_DATA_START,
+    CoverageError,
+    SP500Membership,
+)
 from startx.validation.metrics import deflated_sharpe
 
 PRICE_DIR = "data/cache/prices"
@@ -191,7 +195,8 @@ def _stats(r, ppy):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--start", default="2006-01-01")
+    ap.add_argument("--start", default=str(REAL_DATA_START.date()),
+                    help="panel start (default = the real-data floor; earlier is blocked by the guard)")
     ap.add_argument("--rebal", type=int, default=21)
     ap.add_argument("--decile", type=float, default=0.1)
     ap.add_argument("--cost-bps", type=float, default=5.0, dest="cost_bps")
@@ -204,6 +209,14 @@ def main():
     ppy = 252 / args.rebal
     rstart = pd.Timestamp(args.report_start)
 
+    # GUARD: a cross-sectional study before the real-data floor silently re-injects survivorship
+    # (the missing names are the delisted ones) and produces FAKE results. Fail loud, not silent.
+    if pd.Timestamp(args.start) < REAL_DATA_START:
+        raise CoverageError(
+            f"--start {args.start} is before the real-data floor {REAL_DATA_START.date()}: pre-2016 "
+            f"cross-sections are survivorship-contaminated (the price cache starts ~2010 and misses "
+            f"delisted names). Refusing to produce fake results — use --start >= {REAL_DATA_START.date()}.")
+
     print("loading price cache + PIT membership...")
     cache = _price_cache()
     mem = SP500Membership.load()
@@ -211,6 +224,11 @@ def main():
     print(f"  {len(cache)} symbols cached; building panel [{tag}]...")
     panel, rebal_dates = build_panel(mem, cache, args.start, args.rebal, args.rebal,
                                      survivors_only=args.survivors_only)
+    if not args.survivors_only:                       # the reported window must be ~complete
+        reported = [d for d in rebal_dates if pd.Timestamp(d) >= rstart]
+        rep = mem.require_coverage(cache.keys(), reported, min_cov=0.95)
+        print(f"  coverage guard PASSED: reported window {rstart.date()}+ at "
+              f"{rep['coverage'].min():.0%}-{rep['coverage'].max():.0%} universe coverage")
     print(f"  panel: {len(panel)} rows, {panel['date'].nunique()} rebalances "
           f"({panel['date'].min().date()}..{panel['date'].max().date()}), ~{len(panel)//max(panel['date'].nunique(),1)} names/date\n")
 

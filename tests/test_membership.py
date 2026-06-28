@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import pandas as pd
 
-from startx.data.membership import SP500Membership
+import pytest
+
+from startx.data.membership import CoverageError, SP500Membership
 
 
 def _toy() -> SP500Membership:
@@ -65,3 +67,14 @@ def test_coverage_report():
     rep = m.coverage_report({"AAA", "BBB", "CCC"}, ["2009-01-01", "2026-01-01"])
     assert list(rep["n_members"]) == [2, 3]             # XXX,YYY in 2009 (no prices) -> 2 members
     assert rep.loc[rep.date == "2026-01-01", "coverage"].iloc[0] == 1.0
+
+
+def test_require_coverage_guard():
+    """The survivorship guard must REFUSE (raise) when a date's coverage is below threshold."""
+    m = _toy()
+    # 2009 cross-section is {XXX, YYY}; we have prices for neither -> 0% coverage -> must raise
+    with pytest.raises(CoverageError):
+        m.require_coverage({"AAA", "BBB", "CCC"}, ["2009-01-01", "2026-01-01"], min_cov=0.95)
+    # a fully-covered set must pass and return the report
+    rep = m.require_coverage({"AAA", "BBB", "CCC", "XXX", "YYY"}, ["2009-01-01", "2026-01-01"], min_cov=0.95)
+    assert (rep["coverage"] >= 0.95).all()
