@@ -11,6 +11,26 @@ the other side and why they keep losing, (3) the pre-stated kill condition.
 
 ---
 
+## Round R4 — swing meta-label harness (2026-06-26)  ·  VERDICT: harness SOUND; signal thin/regime-conditional
+
+**Hypothesis:** regime×location×trigger swing setups on tradeable ETFs have a take/skip edge a meta-model
+can size. **Other side:** liquidity providers / late momentum chasers. **Kill:** if no threshold clears
+DSR>0.5 AND PBO<0.5 cost-adjusted OOS, don't promote.
+
+P4 harness PASSES its leakage canary (the gate that makes everything else trustworthy):
+- shuffled-label OOS AUC **0.510** (~0.5 = noise has no edge) ; lookahead feature AUC **1.000** (leak caught).
+
+Walk-forward meta-model (10 ETFs, 7,238 events 2012-26, next-open fills, 3bp, N=15):
+| thr | n | exp/trade | PF | DSR | gate |
+|---|---|---|---|---|---|
+| 0.45 | 864 | +0.21% | 1.28 | 0.92 | — |
+| 0.70 | 96 | +0.49% | 1.72 | 0.75 | — |
+PBO (CSCV, 11 thresholds) = **0.55** (> 0.5) -> threshold selection marginally overfit -> **does NOT promote**.
+Regime-conditional: edge concentrates in stress — risk_on +0.16% / risk_off +0.23% / **crisis +0.77% PF 1.87**
+(n=39). Consistent with every capitulation finding. Thin & regime-dependent; not a clean firewall pass.
+Next (P5): gate the signal on regime (crisis/risk_off) and re-validate OOS as a NEW trial (adds to N), +
+SHAP/permutation feature promotion + drift monitor. Scripts: scripts/swing_validate.py.
+
 ## Round R3 — cross-sectional ML ranker (2026-06-26)  ·  VERDICT: MIRAGE (survivorship)
 
 **Hypothesis:** weak cross-sectional predictability (momentum/reversal/illiquidity) lets a market-neutral
