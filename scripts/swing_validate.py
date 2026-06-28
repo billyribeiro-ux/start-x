@@ -64,7 +64,7 @@ def main():
     base_rate = data["label"].mean()
     print(f"  {len(data)} events  base PT-first rate {base_rate:.0%}  "
           f"({data['entry_date'].min().date()}..{data['entry_date'].max().date()})")
-    print(f"  by trigger: " + " ".join(f"{t}={int(n)}" for t, n in data['trigger'].value_counts().items()))
+    print("  by trigger: " + " ".join(f"{t}={int(n)}" for t, n in data['trigger'].value_counts().items()))
 
     # ---- P4 GATE: leakage canary FIRST (if this fails, the harness is broken) ----
     print("\n=== LEAKAGE CANARY (charter P4 gate) ===")
