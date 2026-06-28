@@ -58,6 +58,18 @@ alpha, NOT bounce-beta. Charter promotion gate (DSR>0, no-search-so-PBO-n/a, OOS
 honest status = real, regime-conditional swing alpha, THIN — size accordingly. (Caveat: 2020-26 was partly
 observed in prior exploration, so the conservative-N DSR ~0.55-0.66 is the fair read, not the N=2 0.96.)
 
+**P6 scanner output + P7 horizon generalization (scripts/swing_scan_live.py, swing_horizon.py):**
+- P6: live scanner surfaces stress-gated setups with CALIBRATED conviction (isotonic, honest ~33% = base
+  hit rate, +EV on 2:1 payoff), ranked SHAP driver attribution (regime_stress dominant), 1-ATR
+  invalidation, regime-matched exp/CVaR. Gate=raw prob (validated rule), display=calibrated. No bare scores.
+- P7 horizon: the edge is SWING-HORIZON-SPECIFIC. Touch-once holdout, stress+prob>=0.5:
+  SHORT_SWING 3d -> exp +0.10%, PF 1.11, DSR 0.07, **alpha -0.13% (beta 0.31)** — alpha gone, mostly beta.
+  SWING 10d -> exp +0.68%, PF 1.71, DSR 0.66, alpha +0.73% (beta 0.12). The selection-alpha needs the full
+  ~10d recovery window; compressing to 3d kills it. v1 swing horizon confirmed; don't shorten it.
+- EOD-feasible charter P1-P7 COMPLETE. DAY/0DTE/SCALP + gamma/charm/DIX/net-liquidity = data seams (need
+  intraday + OPRA + FRED), out of scope on this plan. Promoted signal stands: stress-gated 10d swing alpha,
+  thin (size small, monitor decay).
+
 ## Round R3 — cross-sectional ML ranker (2026-06-26)  ·  VERDICT: MIRAGE (survivorship)
 
 **Hypothesis:** weak cross-sectional predictability (momentum/reversal/illiquidity) lets a market-neutral
