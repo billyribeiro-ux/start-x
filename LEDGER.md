@@ -84,6 +84,23 @@ expectancy (+0.9%) and ALPHA (+0.92%, beta 0.03). VERDICT: the stress-gated swin
 ETFs/indexes/stocks and is breadth-scalable — real, near-pure alpha, thin->size small. The scanner's three
 pillars are validated.
 
+**DECODED ENSEMBLE re-assembly (scripts/decode_ensemble.py) — the swing alpha does NOT improve the system.**
+Real edges only, 2018-26, swing alpha built as an INVESTABLE capped book (<=10 concurrent, no over-
+diversification illusion):
+| stream | Sharpe | CAGR | maxDD | Calmar |
+|---|---|---|---|---|
+| better long model | **1.22** | 13.3% | -14.8% | 0.90 |
+| swing alpha (capped) | 0.84 | 10.1% | **-36.0%** | 0.28 |
+| decoded ensemble (RP combine) | 0.82 | 9.6% | -20.5% | 0.47 |
+| SPY buy&hold | 0.72 | 12.7% | -34.1% | 0.37 |
+corr(long_model, swing_alpha)=+0.05 (low) BUT adding the swing alpha DRAGS the ensemble to 0.82 (-0.40
+Sharpe). **Per-trade alpha != investable book**: the swing edge's +0.90%/trade is real, but as a realistic
+capped book it's Sharpe 0.84 / -36% DD (a capitulation-bounce that gets run over before the bounce,
+concentrated in stress). Low correlation can't rescue a weaker standalone risk profile. VERDICT: the
+bankable decoded CORE is the better long model (Sharpe 1.22); the swing alpha is a real PATTERN, not a
+portfolio improver. Live 3-pillar scanner (ETFs/indexes/stocks) confirmed working — gate correctly OFF
+in the current neutral regime.
+
 ## Round R3 — cross-sectional ML ranker (2026-06-26)  ·  VERDICT: MIRAGE (survivorship)
 
 **Hypothesis:** weak cross-sectional predictability (momentum/reversal/illiquidity) lets a market-neutral

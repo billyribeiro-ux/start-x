@@ -71,8 +71,24 @@ B/C harnesses in the decode scratchpad; `scripts/short_overbought_study.py` (E, 
 
 ## CONSOLIDATED SCOREBOARD (all edges characterized, gathered before assembly)
 
-**The shape of the answer: there is no single oracle. There is a constellation of small, real,
-weakly-correlated edges — and the alpha is in assembling them, weighted by evidence.**
+> 🏁 **THE DECODED SYSTEM — the honest final answer (2026-06-26, after the survivorship + investability audits).**
+> The market's *bankable* decodable structure is ONE engine: the **better long model** — vol-targeted
+> risk-parity across the two regime-aware swing books (short-term IBS mean-reversion + long-term breakout/fear
+> capitulation). **Sharpe 1.22, CAGR 13.3%, maxDD −14.8% (2018-26)** — beats SPY (0.72 / −34% DD) on risk-adjusted
+> return and drawdown. Everything else either died or doesn't add:
+> - **ML cross-sectional ranker** → survivorship MIRAGE (−0.18 OOS survivorship-free). Struck.
+> - **All shorts** (5 angles + regime) → no tradeable edge; market is long-biased at both tails. Struck.
+> - **Stress-gated SWING ALPHA** (the scanner) → a REAL per-trade pattern (+0.90%/trade, alpha +0.92%, beta 0.03,
+>   generalizes ETFs/indexes/stocks) BUT as an investable capped book it's Sharpe 0.84 / **−36% DD**, and adding it
+>   to the long model DRAGS the ensemble to 0.82 (−0.40 Sharpe) despite +0.05 correlation. Per-trade alpha ≠
+>   investable book. NOT a portfolio improver — kept as a research/scanner pattern, not a sleeve.
+> - **Position book** (200-SMA) → drawdown-defense overlay (its own benchmarked mandate), not an alpha adder.
+> The earlier "constellation of edges assembled into ~1.5 Sharpe" was the survivorship/investability illusion.
+> The honest decode: **the long mean-reversion+breakout+fear engine is the edge; the rest is noise, beta, or
+> un-investable patterns.** Repro: `scripts/decode_ensemble.py`, `scripts/long_model.py`.
+
+**The shape of the answer (original Round-1 framing, now superseded by the box above): a constellation of
+small weakly-correlated edges — but the survivorship + investability audits collapsed most of them.**
 
 > ⛔ **CORRECTION (2026-06-26) — the "ML cross-sectional ranker" was a SURVIVORSHIP MIRAGE.** When rebuilt on a
 > point-in-time, survivorship-FREE universe (`startx.data.membership`, incl. delisted names), the identical pipeline
