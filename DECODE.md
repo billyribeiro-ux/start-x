@@ -19,20 +19,29 @@ what runs over a short). Net of ~2bp + realistic borrow. TRAIN 2018-22 / TEST 20
 | **B — single-name breakdown** | breakdown/failed-rally/rel-weak/lower-high, 10 variants, 312k trades | **−1.7 to −6.1** (every variant) | 0.00 | — | ❌ | ~30% win — short the break, it bounces, 1-ATR stop runs over. Best variant +0.26% in TRAIN → −0.55% TEST (overfit). |
 | **C — negative event-drift** | down-gap ≤−5% on ≥1.5× vol, weak close; mirror of Reaction-PEAD | drift fwd5 −0.32% → fwd20 **+1.10%** (INVERTS) | — | — | ❌ | down-gaps *recover*; no downside continuation. Tiny 5d dip < cost. Opposite of a PEAD-short signature. |
 | **D — regime gate** | short worst-decile conditional on 18 bear/breadth/vol/credit flags | **negative in EVERY flag**, TRAIN and TEST | — | — | ❌ | NO regime (below-200, death-cross, weak-breadth, vol-stress) flips shorting positive. Even deep-bear gates lose. |
-| **E — overbought MIRROR** | short the OVERBOUGHT (IBS≥.9, RSI2≥95/98, ext20/50, BB-upper, blow-off gap), 8 setups × 3 trends, 1.89M signals | fwd ret **POSITIVE everywhere** (overbought keeps rising) | — | — | ❌ | the symmetric twin of the long edge: over-extended names DON'T revert down, they MOMENTUM up; blow-off gap-ups in a downtrend forward **+20%** (short squeezes). |
+| **E — overbought MIRROR (endpoint)** | short the OVERBOUGHT (IBS≥.9, RSI2≥95/98, ext20/50, BB-upper, blow-off gap), 8 setups × 3 trends, 1.89M signals, fixed-horizon hold | fwd ret **POSITIVE everywhere** | — | — | ❌ | held to the endpoint, over-extended names MOMENTUM up; blow-off gap-ups in a downtrend forward **+20%** (squeezes). |
+| **F — pullback SCALP (path)** | short over-extension (≥10% > 20-SMA), COVER FAST on a 1-ATR retrace, 1-ATR stop, 3-day cap; 32 configs × 8 gates | **+0.33% in-sample / −0.32% OOS** ungated; **+0.40% OOS when SPY<20-SMA** | 0.23 (gated) | 0.09 | ❌ (but **positive OOS**) | the intraday retrace IS real; ungated it decays in the 2023-26 melt-up, but **gated to a weak tape it is positive OOS** — just not strong enough to clear DSR. |
 
-**The keystone insight (why NO short works):** single-name equities are **long-biased at BOTH tails** — oversold
-names revert UP (bounce; this powers our long IBS dip-buy AND kills every weakness-short A/B/C/D), and overbought
-names continue UP (momentum; this kills the overbought-mirror E). There is no extreme from which price reliably
-falls. Shorting loses at every percentile. That is the decode, and it is symmetric and complete.
+**The keystone insight — refined (this is where the user was right to push):** as an *endpoint* bet, single-name
+equities are **long-biased at both tails** — oversold revert UP (powers the long IBS edge, kills weakness-shorts
+A/B/C/D), overbought continue UP (kills the held-to-endpoint mirror E). BUT the **path** is different from the
+endpoint: "nothing goes up straight" is true — a fast SCALP of the intraday retrace (F), **gated to a weak tape
+(SPY<20-SMA)**, is **positive OOS (+0.40%/trade net of cost+borrow), positive in both halves, PBO 0.09**. It is the
+ONLY short configuration in the whole campaign that doesn't lose out-of-sample. It still fails the *firewall*
+(DSR ~0.23 ≪ 0.95) — given how many configs were searched, the positive could still be luck — so it is a **thin,
+promising, regime-conditional short, NOT yet bankable.** This is the LIVE short thread. Repro: `scripts/short_pullback_scalp.py`
+(ungated config search) + `scripts/short_pullback_regime.py` (the weak-tape gate). Next step to confirm or kill it:
+a pre-registered, low-search-DOF walk-forward on more data — not more config mining (that only inflates DSR's penalty).
 
-**The decoded answer (firewall-grade):** *there is no standalone single-name SHORT alpha in this universe.* Six
-independent tests now agree (these 4 + the two prior index studies). The short side has value ONLY in two roles, both
-already logged: (1) the **short leg of a market-neutral book** (the ML ranker, Sharpe ~0.87 — the long leg finances
-the short; the short leg is the diversifier/hedge, never standalone), and (2) a **small −beta drawdown HEDGE**
-(`overbought_short` — sized small, judged OOS, not alpha). **The qedge scanner correctly returns "LIKELY OVERFIT" for
-single-name shorts — that is the firewall working, not a bug.** A standalone short scanner is the wrong instrument;
-the right one is the market-neutral ranker's short leg. Scripts: `scripts/short_xsec.py` (A), `scripts/short_regime_gate.py` (D);
+**The decoded answer (firewall-grade):** *no standalone single-name SHORT edge clears the firewall yet* — but the
+honest state is NOT "shorts never work." The endpoint angles (A/B/C/D/E) are all dead (weak names bounce, overbought
+runs). The **path** angle (F) is the exception: shorting an over-extension and **scalping the retrace in a weak tape
+is positive OOS** (+0.40%/trade, both halves, PBO 0.09) — it just doesn't clear DSR (0.23). So today the short side
+ships only in two proven roles: (1) the **short leg of a market-neutral book** (the ML ranker, Sharpe ~0.87 — long leg
+finances it), and (2) a **small −beta drawdown HEDGE** (`overbought_short`). And it has **one live research thread**
+worth confirming: the weak-tape pullback-scalp (F), pending a pre-registered walk-forward. **The qedge scanner
+correctly returns "LIKELY OVERFIT" for single-name shorts today — that is the firewall working** — and F is exactly
+the candidate to push at it next, on a tighter search budget so a real positive isn't drowned by the deflation penalty. Scripts: `scripts/short_xsec.py` (A), `scripts/short_regime_gate.py` (D);
 B/C harnesses in the decode scratchpad; `scripts/short_overbought_study.py` (E, the mirror) and
 `scripts/short_scan_study.py` (B+C reproducers). n_trials honestly counted (A=28, B=10, D=18, E=24) so DSR isn't flattered.
 
