@@ -74,11 +74,20 @@ B/C harnesses in the decode scratchpad; `scripts/short_overbought_study.py` (E, 
 **The shape of the answer: there is no single oracle. There is a constellation of small, real,
 weakly-correlated edges — and the alpha is in assembling them, weighted by evidence.**
 
+> ⛔ **CORRECTION (2026-06-26) — the "ML cross-sectional ranker" was a SURVIVORSHIP MIRAGE.** When rebuilt on a
+> point-in-time, survivorship-FREE universe (`startx.data.membership`, incl. delisted names), the identical pipeline
+> on the identical 2018-2026 window gives **OOS Sharpe −0.18 (DSR 0.01)** — and reproduces the old **+0.83 (DSR 0.77)
+> ONLY when fed today's current-survivors** (the biased universe the research used). The whole "edge" was buying
+> tomorrow's known survivors in the past. The naive 12-1 momentum baseline shows the same collapse (+0.40 biased →
+> +0.08 honest). Per staged-search the kill condition is met → **the ranker is NOT a real edge and is struck from the
+> ensemble.** Repro: `scripts/xsec_ranker.py [--survivors-only]`. This invalidates the "best diversifier" and the
+> assembled-ensemble Sharpe below (which weighted it 26%). The validated system is the rule-based books, not this.
+
 ### ✅ REAL, tradeable edges (each thin alone — DSR mostly 0.2–0.6 — but firewall-cleared)
 | Edge | OOS evidence | corr to equity book | role |
 |---|---|---|---|
 | **SPY swing book** (breakout/IBS/fear) | un-levered Sharpe ~1.18, maxDD −9% | 1.0 (it IS the book) | core |
-| **ML cross-sectional ranker** (4wk) | net Sharpe **0.87**, α +24.6% β−0.08, IC t 4.30, **DSR 0.63** | ~0 (market-neutral) | **best diversifier** |
+| ~~**ML cross-sectional ranker** (4wk)~~ | ~~net Sharpe 0.87~~ → **−0.18 survivorship-free (MIRAGE, struck)** | ~0 | ❌ removed |
 | **HMM regime-boundary capitulation** | fwd5d +0.85%, hit 72.6%, **t 3.14** (beats VIX band t 0.94) | overlaps fear sleeve | upgrade the fear trigger |
 | **Reaction-PEAD** (earnings gap-up drift) | +9–13%/yr, t 2.1, DSR 0.14–0.27, sector-neutral survives | +0.08 | thin, orthogonal |
 | **Index-inclusion drift** | +1.27% post-2010, t 3.2, DSR 0.34, ~20 events/yr | ~0 | tiny, orthogonal |
@@ -106,10 +115,15 @@ index, macro) nudges toward ~1.5. Realistic decoded-system target: **a ~1.45–1
 ensemble** — world-class *because* it's a portfolio of real edges, not a fragile single signal.
 
 ### 🏁 ASSEMBLED — the decoded system (real streams, monthly, max-Sharpe; `portfolio/ensemble.py`)
+> ⛔ **VOID (2026-06-26):** this ensemble weighted the ML ranker 26%, and the ranker is a survivorship mirage
+> (−0.18 OOS survivorship-free, see correction above). The 1.38 / DSR 0.995 headline does not stand. The real
+> system is the rule-based books + the better long model; a re-assembled ensemble must use only survivorship-free,
+> firewall-cleared streams. Re-build pending.
+
 | Edge | Sharpe | weight | corr to book |
 |---|---|---|---|
 | SPY swing book | 1.12 | 72% | 1.00 |
-| ML ranker (market-neutral) | 0.90 | 26% | 0.09 |
+| ~~ML ranker (market-neutral)~~ | ~~0.90~~ **mirage** | ~~26%~~ → 0% | — |
 | Reaction-PEAD | 0.44 | 2% | 0.23 |
 
 **Ensemble: Sharpe 1.38 · deflated Sharpe 0.995 · CAGR +12.9% · maxDD −8.7% · Calmar 1.49** (89 months).
