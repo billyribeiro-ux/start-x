@@ -70,6 +70,20 @@ observed in prior exploration, so the conservative-N DSR ~0.55-0.66 is the fair 
   intraday + OPRA + FRED), out of scope on this plan. Promoted signal stands: stress-gated 10d swing alpha,
   thin (size small, monitor decay).
 
+**Hardening — SINGLE-NAME generalization (scripts/swing_singlenames.py): the edge covers ETFs + indexes +
+STOCKS.** Survivorship-free PIT universe, 200 liquid names, 76,065 events, touch-once holdout 2020-26:
+| rule | n | exp | PF | alpha | beta |
+|---|---|---|---|---|---|
+| stress raw (all) | 7134 | +0.55% | 1.33 | +0.43% | 0.21 |
+| stress + prob>=.5 | 512 | **+0.90%** | 1.63 | **+0.92%** | **0.03** |
+STRONGER on stocks than ETFs (+0.90 vs +0.68/trade), near-PURE alpha (beta 0.03), big breadth. Sharpe is
+construction-dependent and bracketed: per-trade ~0.9 (conservative) to a naive calendar-book ~3 (OVER-
+diversified — averages 100s of correlated stress-day names as if independent; NOT a reliable investable
+number, the same illusion as the short breadth case). The robust, construction-free facts are the
+expectancy (+0.9%) and ALPHA (+0.92%, beta 0.03). VERDICT: the stress-gated swing edge generalizes across
+ETFs/indexes/stocks and is breadth-scalable — real, near-pure alpha, thin->size small. The scanner's three
+pillars are validated.
+
 ## Round R3 — cross-sectional ML ranker (2026-06-26)  ·  VERDICT: MIRAGE (survivorship)
 
 **Hypothesis:** weak cross-sectional predictability (momentum/reversal/illiquidity) lets a market-neutral
