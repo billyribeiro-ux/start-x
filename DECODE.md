@@ -20,28 +20,32 @@ what runs over a short). Net of ~2bp + realistic borrow. TRAIN 2018-22 / TEST 20
 | **C — negative event-drift** | down-gap ≤−5% on ≥1.5× vol, weak close; mirror of Reaction-PEAD | drift fwd5 −0.32% → fwd20 **+1.10%** (INVERTS) | — | — | ❌ | down-gaps *recover*; no downside continuation. Tiny 5d dip < cost. Opposite of a PEAD-short signature. |
 | **D — regime gate** | short worst-decile conditional on 18 bear/breadth/vol/credit flags | **negative in EVERY flag**, TRAIN and TEST | — | — | ❌ | NO regime (below-200, death-cross, weak-breadth, vol-stress) flips shorting positive. Even deep-bear gates lose. |
 | **E — overbought MIRROR (endpoint)** | short the OVERBOUGHT (IBS≥.9, RSI2≥95/98, ext20/50, BB-upper, blow-off gap), 8 setups × 3 trends, 1.89M signals, fixed-horizon hold | fwd ret **POSITIVE everywhere** | — | — | ❌ | held to the endpoint, over-extended names MOMENTUM up; blow-off gap-ups in a downtrend forward **+20%** (squeezes). |
-| **F — pullback SCALP (path)** | short over-extension (≥10% > 20-SMA), COVER FAST on a 1-ATR retrace, 1-ATR stop, 3-day cap; 32 configs × 8 gates | **+0.33% in-sample / −0.32% OOS** ungated; **+0.40% OOS when SPY<20-SMA** | 0.23 (gated) | 0.09 | ❌ (but **positive OOS**) | the intraday retrace IS real; ungated it decays in the 2023-26 melt-up, but **gated to a weak tape it is positive OOS** — just not strong enough to clear DSR. |
+| **F — pullback SCALP (path)** | short over-extension (≥10% > 20-SMA), COVER FAST on a 1-ATR retrace, 1-ATR stop, 3-day cap; weak-tape gate (SPY<20-SMA) | **+0.40%/trade OOS on full universe → KILLED: −0.17%/trade on LIQUID names** | 0.49 (liquid) | — | ❌ | looked positive on the FULL universe, but pre-registered walk-forward exposed it as a MIRAGE — microcap/bad-data outliers (trades −267%..+98%) + a breadth illusion. On tradeable names (>$5, >$20M ADV) it is negative, Sharpe ~0. |
 
-**The keystone insight — refined (this is where the user was right to push):** as an *endpoint* bet, single-name
-equities are **long-biased at both tails** — oversold revert UP (powers the long IBS edge, kills weakness-shorts
-A/B/C/D), overbought continue UP (kills the held-to-endpoint mirror E). BUT the **path** is different from the
-endpoint: "nothing goes up straight" is true — a fast SCALP of the intraday retrace (F), **gated to a weak tape
-(SPY<20-SMA)**, is **positive OOS (+0.40%/trade net of cost+borrow), positive in both halves, PBO 0.09**. It is the
-ONLY short configuration in the whole campaign that doesn't lose out-of-sample. It still fails the *firewall*
-(DSR ~0.23 ≪ 0.95) — given how many configs were searched, the positive could still be luck — so it is a **thin,
-promising, regime-conditional short, NOT yet bankable.** This is the LIVE short thread. Repro: `scripts/short_pullback_scalp.py`
-(ungated config search) + `scripts/short_pullback_regime.py` (the weak-tape gate). Next step to confirm or kill it:
-a pre-registered, low-search-DOF walk-forward on more data — not more config mining (that only inflates DSR's penalty).
+**The keystone insight — and the trap the user's push surfaced (then the firewall caught):** as an *endpoint* bet,
+single-name equities are **long-biased at both tails** — oversold revert UP (powers the long IBS edge, kills
+weakness-shorts A/B/C/D), overbought continue UP (kills the held-to-endpoint mirror E). The **path** angle (F) was
+the one that looked alive: a fast SCALP of the intraday retrace, gated to a weak tape, showed +0.40%/trade OOS and a
+pre-registered walk-forward Sharpe ~1.9 / DSR 1.0. **That was TOO GOOD — and it was a mirage.** Adversarial
+verification killed it: the per-trade returns ran −267%..+98% (microcap / bad-data / delisted-to-zero junk you can
+never short), the median trade was +0.01% (zero), the high Sharpe came from a *breadth illusion* (averaging thousands
+of correlated names crushes the daily vol), and it wasn't even beta (corr to short-SPY ~0). **Filtered to liquid,
+tradeable names (>$5, >$20M/day ADV) the edge is NEGATIVE (−0.17%/trade, Sharpe −0.01, DSR 0.49).** The "retrace to
+the mean" is descriptively real but too small to trade net of costs on liquid names. Lesson reinforced: a
+spectacular daily-book Sharpe across a huge junk universe is a red flag, not a trophy. Repro: `scripts/short_pullback_scalp.py`
+(config search), `scripts/short_pullback_regime.py` (weak-tape gate, full universe), `scripts/short_pullback_walkforward.py`
+(the kill — FULL vs LIQUID + the short-SPY beta benchmark).
 
-**The decoded answer (firewall-grade):** *no standalone single-name SHORT edge clears the firewall yet* — but the
-honest state is NOT "shorts never work." The endpoint angles (A/B/C/D/E) are all dead (weak names bounce, overbought
-runs). The **path** angle (F) is the exception: shorting an over-extension and **scalping the retrace in a weak tape
-is positive OOS** (+0.40%/trade, both halves, PBO 0.09) — it just doesn't clear DSR (0.23). So today the short side
-ships only in two proven roles: (1) the **short leg of a market-neutral book** (the ML ranker, Sharpe ~0.87 — long leg
-finances it), and (2) a **small −beta drawdown HEDGE** (`overbought_short`). And it has **one live research thread**
-worth confirming: the weak-tape pullback-scalp (F), pending a pre-registered walk-forward. **The qedge scanner
-correctly returns "LIKELY OVERFIT" for single-name shorts today — that is the firewall working** — and F is exactly
-the candidate to push at it next, on a tighter search budget so a real positive isn't drowned by the deflation penalty. Scripts: `scripts/short_xsec.py` (A), `scripts/short_regime_gate.py` (D);
+**The decoded answer (firewall-grade):** *no tradeable single-name SHORT edge exists in this universe.* All six angles
+(A/B/C/D/E endpoint + F path) are now dead on tradeable names. F survived longest — the pre-registered walk-forward
+was run exactly as planned to confirm-or-kill it, and it **killed it** (liquid-only Sharpe ~0; the "+0.40%" was junk
+outliers + a breadth illusion). The short side ships only in two proven roles: (1) the **short leg of a market-neutral
+book** (the ML ranker, Sharpe ~0.87 — the long leg finances it), and (2) a **small −beta drawdown HEDGE**
+(`overbought_short`, sized small, not alpha). **The qedge scanner correctly returns "LIKELY OVERFIT" for single-name
+shorts — that is the firewall working, not a bug.** A standalone short scanner is the wrong instrument on this
+universe; the right one is the market-neutral ranker's short leg. The honest scanner deliverable is a *candidate
+surfacer* that lists names triggering the (research-only) short setup with their true firewall status — never a
+"profitable short signal," because none survives liquidity + cost + deflation. Scripts: `scripts/short_xsec.py` (A), `scripts/short_regime_gate.py` (D);
 B/C harnesses in the decode scratchpad; `scripts/short_overbought_study.py` (E, the mirror) and
 `scripts/short_scan_study.py` (B+C reproducers). n_trials honestly counted (A=28, B=10, D=18, E=24) so DSR isn't flattered.
 

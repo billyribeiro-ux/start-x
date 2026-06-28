@@ -5,9 +5,9 @@ works in 2018-22 but decays to negative in the 2023-26 momentum melt-up (see sho
 This gates it: only short when the BROAD TAPE is weak (SPY below its 20-day SMA) — the regime where a
 retrace-to-the-mean actually arrives. That flips the OOS positive: ~+0.40%/trade net of 4bp + 5%/yr
 borrow, positive in BOTH halves, low PBO. BUT it does NOT clear the deflated-Sharpe firewall (DSR ~0.23
-< 0.95): given the breadth of the config search it is a THIN, PROMISING, regime-conditional positive —
-not yet a bankable edge. This is the live short thread; it needs a pre-registered, lower-search-DOF
-validation (walk-forward / more data) before it can be trusted.
+< 0.95). UPDATE — the pre-registered walk-forward KILLED it: this full-universe "+0.40%" is a MIRAGE
+driven by microcap/bad-data outliers + a breadth illusion. On LIQUID tradeable names the edge is
+NEGATIVE (-0.17%/trade, Sharpe ~0). See scripts/short_pullback_walkforward.py. No tradeable short edge.
 
     python scripts/short_pullback_regime.py [--max-names N]
 """
