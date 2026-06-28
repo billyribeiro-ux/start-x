@@ -36,6 +36,24 @@ spectacular daily-book Sharpe across a huge junk universe is a red flag, not a t
 (config search), `scripts/short_pullback_regime.py` (weak-tape gate, full universe), `scripts/short_pullback_walkforward.py`
 (the kill — FULL vs LIQUID + the short-SPY beta benchmark).
 
+### "Both ways" / regime-conditional check — does shorting work in a confirmed BEAR? (mostly no)
+The point of decoding shorts is a both-ways ML for when the bull ends. So we tested the fair question:
+short the INDEX gated to a confirmed bear (SPY < 200-SMA), 2007-2026 (cache covers the 2008/2020/2022
+bears). `scripts/short_regime_overlay.py`:
+- **Naive daily-hold short, bear-days only:** ann **−15.9%**, Sharpe −0.30. Shorting loses even *in* the
+  bear — because bear markets are **rally-infested** (the sharpest up-days happen in downtrends) and the
+  200-SMA is laggy. Only **2008 (+28.8%)** paid; 2020 −18.6%, 2022 −4.5%.
+- **Trailing TREND short (short fresh lows in a bear, ride a 3-ATR chandelier):** still loses overall
+  (Sharpe −0.23, −47% total). It rescues 2009/2020 but the chandelier whipsaws out of 2008's grind
+  (+28.8% → +3.8%) and 2022's rallies chop it to −18.1%.
+- **Verdict:** NO directional index short — blended, regime-gated, or trend-ridden — is profitable across
+  20 years incl. three bears. **The market is structurally asymmetric: "both ways" is NOT symmetric.**
+- **So what IS the both-ways mechanism?** (a) **Regime-switch long→CASH** in bears = System #3 position
+  book (validated: ~half the drawdown), the legitimate defensive both-ways — flat, not short; (b) the
+  **market-neutral ranker** where the short leg is RELATIVE (long strong / short weak), financed and
+  hedged, never directional; (c) a tiny −beta tail hedge. The ML's job is **regime detection + relative
+  ranking**, NOT learning a directional short signal (there isn't one, even for the bear).
+
 **The decoded answer (firewall-grade):** *no tradeable single-name SHORT edge exists in this universe.* All six angles
 (A/B/C/D/E endpoint + F path) are now dead on tradeable names. F survived longest — the pre-registered walk-forward
 was run exactly as planned to confirm-or-kill it, and it **killed it** (liquid-only Sharpe ~0; the "+0.40%" was junk
