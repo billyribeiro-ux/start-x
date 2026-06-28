@@ -1,5 +1,5 @@
 {
-  "iteration": 3,
+  "iteration": 4,
   "promoted": [],
   "tested": [
     "feature_tail:rsi2:<",
@@ -62,7 +62,21 @@
       "veto_q_best": 0.85,
       "exp_mlveto": 0.010360237260460188,
       "no_promote_streak": 3
+    },
+    {
+      "iteration": 4,
+      "ts": "2026-06-28T21:39:31+00:00",
+      "taken": 366,
+      "promoted_total": 0,
+      "promoted_this_iter": null,
+      "exp_raw": 0.009475653658259075,
+      "exp_avoids": 0.009475653658259075,
+      "dsr_raw": 0.9070917420794182,
+      "dsr_avoids": 0.9070917420794182,
+      "veto_q_best": 0.85,
+      "exp_mlveto": 0.010360237260460188,
+      "no_promote_streak": 4
     }
   ],
-  "no_promote_streak": 3
+  "no_promote_streak": 4
 }

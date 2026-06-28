@@ -125,6 +125,10 @@ def main():
         os.makedirs(os.path.dirname(TAKEN_CACHE), exist_ok=True)
         taken.to_parquet(TAKEN_CACHE)
         print(f"  cached taken book -> {TAKEN_CACHE}")
+        if args.rebuild and (mem.tested or mem.rejected):     # fresh data = new epoch: re-sweep all
+            print(f"  --rebuild: new data epoch — re-testing {len(mem.tested)} prior candidates against "
+                  "the refreshed book (promoted rules kept + decay-checked)")
+            mem.tested, mem.rejected, mem.no_promote_streak = [], [], 0
     else:
         taken = pd.read_parquet(TAKEN_CACHE)
         print(f"  loaded cached taken book ({len(taken)} trades) — use --rebuild to refresh")
