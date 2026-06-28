@@ -86,6 +86,17 @@ B/C harnesses in the decode scratchpad; `scripts/short_overbought_study.py` (E, 
 > The earlier "constellation of edges assembled into ~1.5 Sharpe" was the survivorship/investability illusion.
 > The honest decode: **the long mean-reversion+breakout+fear engine is the edge; the rest is noise, beta, or
 > un-investable patterns.** Repro: `scripts/decode_ensemble.py`, `scripts/long_model.py`.
+>
+> 🔁 **SELF-LEARNING UPDATE (R5, 2026-06-28) — "can we learn from the losers and avoid them?" → NO, proven.**
+> A new self-learning loss loop (`scanner/selflearn.py`, `scripts/swing_selflearn_loss.py`) dissects every
+> losing swing trade, distills pre-registered AVOID rules + a walk-forward 2nd-stage P(loss) veto, and judges
+> them on a purged out-of-sample firewall. It ran to convergence (6 trials, all rejected): **the loss-prone
+> cohort has the FATTEST RIGHT TAIL** — every veto removed *net-profitable* trades (vetoed cohorts paid
+> +2.0% to +3.7%/trade). The variance IS the edge; the losses are the irreducible cost of the bet, not a
+> separable subset. The WHY is documented (losers are shallower dips — lower rsi2/range — that bleed through
+> the 1-ATR stop; worst trigger = pullback 57%). The self-learning layer is wired into the live scanner but
+> correctly holds **0 avoid rules** — and that null result is the deliverable: it blocks a plausible-but-wrong
+> filter that looked great in-sample (higher loss *rate*) but cut returns OOS. See LEDGER R5 + SELFLEARN_LOG.md.
 
 **The shape of the answer (original Round-1 framing, now superseded by the box above): a constellation of
 small weakly-correlated edges — but the survivorship + investability audits collapsed most of them.**

@@ -11,6 +11,41 @@ the other side and why they keep losing, (3) the pre-stated kill condition.
 
 ---
 
+## Round R5 — self-learning LOSS loop (2026-06-28)  ·  VERDICT: the losses are NOT separably avoidable (firewall held)
+
+**Hypothesis:** the ~52% of stress-gated swing takes that lose share an ex-ante signature a model can learn
+to AVOID, lifting the book's risk-adjusted return. **Other side:** if true, we'd be the only ones leaving
+that money on the table — unlikely for a public-feature mean-reversion edge. **Kill (pre-stated):** if no
+avoid mechanism lifts expectancy AND PF AND DSR out-of-sample with the vetoed cohort genuinely worse, the
+losses are the irreducible cost of the bet — do not filter. Engine: `scanner/selflearn.py` +
+`scripts/swing_selflearn_loss.py` (purged walk-forward over the full 366-trade taken book, ETFs + 120
+survivorship-free liquid stocks; `scanner_memory.json` persists; converges at 3 non-promotes).
+
+**The WHY (post-mortem, descriptive):** loss rate by trigger `pullback` 57% > `mean_rev` 53% > `rs_break`
+45% > `squeeze` 21%; by regime risk_off 54% ≈ crisis 49%. Losers are SHALLOWER dips (lower rsi2, lower
+pos_range20/bb_pos — they buy a not-deep-enough pullback that keeps bleeding through the 1-ATR stop).
+
+**Every avoidance mechanism tested REMOVED net-profitable trades (the decisive result):**
+| # | avoid mechanism | OOS (walk-forward) result | vetoed cohort | verdict |
+|---|---|---|---|---|
+| R5.1 | ML 2nd-stage P(loss) veto, q=0.80 | exp +1.21%→+0.88%, DSR 0.85→0.44 | **+2.79%** | reject |
+| R5.2 | ML P(loss) veto, q=0.85 | exp +1.21%→+1.04%, DSR 0.85→0.61 | **+2.22%** | reject |
+| R5.3 | ML P(loss) veto, q=0.90 | exp +1.21%→+0.98%, DSR 0.85→0.60 | **+3.71%** | reject |
+| R5.4 | rule: AVOID rsi2 low tail (shallow dip) | exp +1.21%→+0.93% | +2.02% | reject |
+| R5.5 | rule: AVOID trigger=pullback | exp +1.21%→+1.23% (PF/DSR down) | +1.13% | reject |
+| R5.6 | rule: AVOID dist_sma200 high tail | exp +1.21%→+1.06% (vetoed BETTER) | +1.79% | reject |
+
+**Finding:** the cohort the loss-model flags as "most likely to lose" is the cohort with the FATTEST RIGHT
+TAIL — the deepest-stress entries lose more often but pay the most when they work. Trimming the left tail
+trims more of the right. **The variance IS the edge.** Self-learning loss-avoidance CONVERGED to the empty
+set (0 promoted rules) — and that null result is the value: it blocks a plausible-but-wrong avoid filter
+that would have quietly cut returns (it looked great in-sample: vetoed cohorts have higher loss *rates*).
+The raw stress-gated book stands unfiltered: **n=366, exp +0.95%/trade, PF 1.60, DSR 0.91.** The
+self-learning layer is now wired into the live scanner (it will flag-and-explain any avoid rule that ever
+DOES clear the firewall as new data arrives) but currently holds nothing — correctly. **+6 trials → N.**
+
+---
+
 ## Round R4 — swing meta-label harness (2026-06-26)  ·  VERDICT: harness SOUND; signal thin/regime-conditional
 
 **Hypothesis:** regime×location×trigger swing setups on tradeable ETFs have a take/skip edge a meta-model
@@ -134,7 +169,7 @@ liquid names. Detail in DECODE.md (single-name equities are long-biased at both 
 ---
 
 ## Running project N (fed to every DSR/PBO from here)
-Short campaign ≈ 336 · ranker A/B = 4 · misc baselines ≈ 10 → **N ≈ 350** and counting. With N this large,
+Short campaign ≈ 336 · ranker A/B = 4 · misc baselines ≈ 10 · R5 loss-avoidance = 6 → **N ≈ 356** and counting. With N this large,
 the deflation bar is high by design: only edges with a strong prior + clean OOS + low search cost clear it.
 Validated production systems (the three rule-based books, the better long model) were each established under
 their own pre-registered, low-N protocols — see CHANGELOG/STRATEGY/FINDINGS — and are NOT diluted by this

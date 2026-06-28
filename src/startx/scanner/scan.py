@@ -36,6 +36,8 @@ class Setup:
     cohort_exp: float
     cohort_cvar5: float
     cohort_n: int
+    vetoed: bool = False                        # filtered by a self-learned avoid rule
+    veto_reason: str = ""                       # which learned loss-pattern vetoed it
 
 
 @dataclass
@@ -73,8 +75,14 @@ def _cohort(data: pd.DataFrame, regime: str, prob: float, *, band: float = 0.1) 
 
 
 def surface(sm: ScanModel, prices_by_sym: dict, reg: pd.DataFrame, *, asof=None, lookback: int = 10,
-            cutoff: float = PROB_CUTOFF) -> list[Setup]:
-    """Surface stress-gated setups whose entry falls in [asof-lookback, asof], calibrated + attributed."""
+            cutoff: float = PROB_CUTOFF, avoid_rules=None) -> list[Setup]:
+    """Surface stress-gated setups whose entry falls in [asof-lookback, asof], calibrated + attributed.
+
+    ``avoid_rules`` (from the self-learning loss memory) do not drop setups silently — each surviving
+    setup is flagged ``vetoed`` with the learned loss-pattern that triggered it, so the output shows what
+    the system has learned to AVOID and why (transparent, per the charter's no-black-box rule).
+    """
+    avoid_rules = avoid_rules or []
     data = sm.data.copy()
     # raw prob = the PROMOTED rule's gate (validated at raw>=0.5); calibrated prob = the displayed
     # conviction + the cohort-matching key (isotonic maps raw -> empirical hit rate, base ~30%).
@@ -104,8 +112,15 @@ def surface(sm: ScanModel, prices_by_sym: dict, reg: pd.DataFrame, *, asof=None,
             order = np.argsort(-np.abs(c))[:3]
             drivers = [(sm.feat_cols[k], float(c[k])) for k in order]
         cexp, ccvar, cn = _cohort(data, row.get("regime"), float(row["cal_prob"]))
+        veto_reason = ""
+        for rule in avoid_rules:
+            if bool(rule.mask_vetoed(row.to_frame().T.reset_index(drop=True))[0]):
+                veto_reason = rule.rationale or rule.key()
+                break
         out.append(Setup(symbol=sym, date=row["entry_date"], direction="long",
                          regime=row.get("regime"), trigger=row["trigger"], conviction=float(row["cal_prob"]),
                          drivers=drivers, entry_ref=entry, invalidation=inval,
-                         cohort_exp=cexp, cohort_cvar5=ccvar, cohort_n=cn))
-    return sorted(out, key=lambda s: -s.conviction)
+                         cohort_exp=cexp, cohort_cvar5=ccvar, cohort_n=cn,
+                         vetoed=bool(veto_reason), veto_reason=veto_reason))
+    # surviving setups first (by conviction), vetoed ones after — both shown, transparently
+    return sorted(out, key=lambda s: (s.vetoed, -s.conviction))

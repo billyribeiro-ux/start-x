@@ -26,6 +26,7 @@ from startx.data.membership import SP500Membership
 from startx.scanner.harness import build_dataset
 from startx.scanner.regime import classify, regime_panel
 from startx.scanner.scan import STRESS, fit, surface
+from startx.scanner.selflearn import ScannerMemory
 
 PRICE_DIR = "data/cache/prices"
 ETFS = ["SPY", "QQQ", "IWM", "DIA", "XLF", "XLK", "XLE", "SMH", "XLV", "XLU"]   # ETFs + index ETFs
@@ -60,11 +61,14 @@ def _load(sym):
 
 def _card(s):
     drv = ", ".join(f"{n}{'+' if v >= 0 else ''}{v:.2f}" for n, v in s.drivers)
-    print(f"  {s.symbol:5} {str(s.date.date())}  {s.direction.upper():5} [{s.regime}]  trigger={s.trigger}")
+    flag = "  ⛔AVOIDED" if s.vetoed else ""
+    print(f"  {s.symbol:5} {str(s.date.date())}  {s.direction.upper():5} [{s.regime}]  trigger={s.trigger}{flag}")
     print(f"        conviction(calibrated) {s.conviction:.0%}  |  entry~{s.entry_ref:.2f}  "
           f"invalidation {s.invalidation:.2f}")
     print(f"        drivers: {drv}")
     print(f"        regime-cohort: exp {s.cohort_exp*100:+.2f}%  CVaR5% {s.cohort_cvar5*100:.2f}%  (n={s.cohort_n})")
+    if s.vetoed:
+        print(f"        self-learned avoid: {s.veto_reason}")
 
 
 def main():
@@ -84,23 +88,31 @@ def main():
     data = data[data["entry_date"] >= "2012-01-01"]
     sm = fit(data)
 
+    avoid_rules = ScannerMemory.load().promoted_rules()      # the self-learned loss-avoidance layer
+    if avoid_rules:
+        print(f"  self-learned avoid layer ACTIVE: {len(avoid_rules)} rule(s) from data/scanner_memory.json")
+        for r in avoid_rules:
+            print(f"    ⛔ {r.rationale or r.key()}")
+
     asof = data["entry_date"].max()
     cur_regime = reg.loc[reg.index <= asof, "regime"].iloc[-1]
     print(f"\nSWING SCANNER — as-of {asof.date()}  |  current regime: {cur_regime}")
     print("(promoted rule: LONG swing setups in a STRESS regime with calibrated conviction >= 50%)\n")
 
-    setups = surface(sm, prices, reg, asof=asof, lookback=args.lookback)
+    setups = surface(sm, prices, reg, asof=asof, lookback=args.lookback, avoid_rules=avoid_rules)
     if setups:
-        print(f"=== {len(setups)} live setup(s) in the last {args.lookback} sessions ===")
+        live = [s for s in setups if not s.vetoed]
+        avoided = [s for s in setups if s.vetoed]
+        print(f"=== {len(live)} actionable + {len(avoided)} self-avoided setup(s) in the last {args.lookback} sessions ===")
         for s in setups:
             _card(s)
     else:
         off = cur_regime not in STRESS
         print(f"=== no live setups{' — gate OFF (current regime is not stress)' if off else ''} ===")
         # show the most recent qualifying cohort as a worked example of the output card
-        hist = surface(sm, prices, reg, asof=asof, lookback=4000)
+        hist = surface(sm, prices, reg, asof=asof, lookback=4000, avoid_rules=avoid_rules)
         if hist:
-            ex = hist[0] if False else max(hist, key=lambda s: s.date)
+            ex = max(hist, key=lambda s: s.date)
             print("\nMost recent qualifying setup (worked example of the card format):")
             _card(ex)
     print("\nEvery setup is explained to its drivers + a regime-matched cohort — no bare scores (charter).")

@@ -1,0 +1,68 @@
+{
+  "iteration": 3,
+  "promoted": [],
+  "tested": [
+    "feature_tail:rsi2:<",
+    "trigger:pullback:==",
+    "feature_tail:dist_sma200:>"
+  ],
+  "rejected": [
+    {
+      "key": "feature_tail:rsi2:<",
+      "rationale": "losers cluster at low rsi2 (DEV loss 59% vs 50%)"
+    },
+    {
+      "key": "trigger:pullback:==",
+      "rationale": "trigger 'pullback' loses 57% vs 51% on DEV"
+    },
+    {
+      "key": "feature_tail:dist_sma200:>",
+      "rationale": "losers cluster at high dist_sma200 (DEV loss 55% vs 51%)"
+    }
+  ],
+  "history": [
+    {
+      "iteration": 1,
+      "ts": "2026-06-28T21:34:16+00:00",
+      "taken": 366,
+      "promoted_total": 0,
+      "promoted_this_iter": null,
+      "exp_raw": 0.009475653658259075,
+      "exp_avoids": 0.009475653658259075,
+      "dsr_raw": 0.9116742995390374,
+      "dsr_avoids": 0.9116742995390374,
+      "veto_q_best": 0.85,
+      "exp_mlveto": 0.010360237260460188,
+      "no_promote_streak": 1
+    },
+    {
+      "iteration": 2,
+      "ts": "2026-06-28T21:34:19+00:00",
+      "taken": 366,
+      "promoted_total": 0,
+      "promoted_this_iter": null,
+      "exp_raw": 0.009475653658259075,
+      "exp_avoids": 0.009475653658259075,
+      "dsr_raw": 0.9101267400626194,
+      "dsr_avoids": 0.9101267400626194,
+      "veto_q_best": 0.85,
+      "exp_mlveto": 0.010360237260460188,
+      "no_promote_streak": 2
+    },
+    {
+      "iteration": 3,
+      "ts": "2026-06-28T21:34:23+00:00",
+      "taken": 366,
+      "promoted_total": 0,
+      "promoted_this_iter": null,
+      "exp_raw": 0.009475653658259075,
+      "exp_avoids": 0.009475653658259075,
+      "dsr_raw": 0.9085994020646331,
+      "dsr_avoids": 0.9085994020646331,
+      "veto_q_best": 0.85,
+      "exp_mlveto": 0.010360237260460188,
+      "no_promote_streak": 3
+    }
+  ],
+  "no_promote_streak": 3
+}
