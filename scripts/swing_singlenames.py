@@ -28,7 +28,6 @@ from startx.data.membership import REAL_DATA_START, SP500Membership
 from startx.scanner.harness import _curve_stats, build_dataset
 from startx.scanner.regime import classify, regime_panel
 from startx.scanner.signals import FEATURES
-from startx.validation.metrics import deflated_sharpe
 
 PRICE_DIR = "data/cache/prices"
 STRESS = ["risk_off", "crisis"]
@@ -103,23 +102,40 @@ def main():
     m.fit(dev[feat].fillna(0.0), dev["label"])
     hold["prob"] = m.predict_proba(hold[feat].fillna(0.0))[:, 1]
 
+    def cal_book(sub):
+        """Calendar-time equal-weight daily book (honest Sharpe — single-name entries cluster)."""
+        from collections import defaultdict
+        s, cnt = defaultdict(float), defaultdict(int)
+        for _, t in sub.iterrows():
+            e, x = pd.Timestamp(t["entry_date"]), pd.Timestamp(t["t1"])
+            days = pd.bdate_range(e + pd.Timedelta(days=1), x)
+            per = t["ret"] / max(len(days), 1)
+            for d in days:
+                s[d] += per; cnt[d] += 1
+        if not s:
+            return float("nan")
+        idx = sorted(s)
+        bk = pd.Series([s[d] / cnt[d] for d in idx], index=pd.DatetimeIndex(idx))
+        sd = bk.std(ddof=1)
+        return float(bk.mean() / sd * np.sqrt(252)) if sd > 0 else float("nan")
+
     print("=== TOUCH-ONCE HOLDOUT (2020-26) — stress-gated single-name swing ===")
-    print(f"  {'rule':22}{'n':>6}{'exp':>9}{'PF':>6}{'win':>6}{'Sharpe':>8}{'DSR16':>7}{'alpha':>8}{'beta':>6}")
+    print(f"  {'rule':22}{'n':>6}{'exp':>9}{'PF':>6}{'perTradeSh':>11}{'calBookSh':>10}{'alpha':>8}{'beta':>6}")
     for label, sub in [("stress raw (all)", hold[hold["regime"].isin(STRESS)]),
                        ("stress + prob>=.5", hold[hold["regime"].isin(STRESS) & (hold["prob"] >= 0.5)])]:
         r = sub.set_index("entry_date")["ret"].sort_index()
         st = _curve_stats(r)
         if not st or st["n"] < 30:
             print(f"  {label:22}{(st.get('n',0) if st else 0):>6}   underpowered"); continue
-        dsr = float(deflated_sharpe(r.values, n_trials=16))
+        calsh = cal_book(sub)                                  # the HONEST, clustering-aware Sharpe
         spyfwd = (spy.shift(-10) / spy - 1.0).reindex(r.index)
         df = pd.concat([r.rename("y"), spyfwd.rename("x")], axis=1).dropna()
         beta = float(np.polyfit(df.x, df.y, 1)[0])
         alpha = float(df.y.mean() - beta * df.x.mean())
         print(f"  {label:22}{st['n']:>6}{st['expectancy']*100:>8.2f}%{st['profit_factor']:>6.2f}"
-              f"{(r>0).mean()*100:>5.0f}%{st['sharpe']:>8.2f}{dsr:>7.2f}{alpha*100:>7.2f}%{beta:>6.2f}")
-    print("\n  Read: positive exp + alpha + DSR>0.5 on single names => the edge generalizes beyond ETFs")
-    print("  (and is breadth-scalable). If it collapses, it was ETF-specific. win_rate not used to select.")
+              f"{st['sharpe']:>11.2f}{calsh:>10.2f}{alpha*100:>7.2f}%{beta:>6.2f}")
+    print("\n  perTradeSh overstates (clustered entries); calBookSh is the honest risk-adjusted number.")
+    print("  Positive exp + alpha + calBookSh>0 => edge generalizes to stocks. win_rate not used to select.")
 
 
 if __name__ == "__main__":
