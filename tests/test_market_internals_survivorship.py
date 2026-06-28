@@ -8,11 +8,9 @@ B. ``startx.strategy.market_internals.compute_internals`` enforces a genuine ``d
 """
 from __future__ import annotations
 
-import os
 import warnings
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 import pytest
 

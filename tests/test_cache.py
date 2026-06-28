@@ -8,7 +8,6 @@ import time
 import warnings
 
 import pandas as pd
-import pytest
 
 from startx.data.cache import ParquetCache
 

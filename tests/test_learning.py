@@ -25,7 +25,6 @@ from startx.learning import (
 )
 from startx.learning.autopsy import forensic_feature_columns
 from startx.data.prices import _enrich
-from startx.models.train import model_factory
 
 
 # --------------------------------------------------------------------------- builders
