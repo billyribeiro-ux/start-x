@@ -28,8 +28,20 @@ Walk-forward meta-model (10 ETFs, 7,238 events 2012-26, next-open fills, 3bp, N=
 PBO (CSCV, 11 thresholds) = **0.55** (> 0.5) -> threshold selection marginally overfit -> **does NOT promote**.
 Regime-conditional: edge concentrates in stress — risk_on +0.16% / risk_off +0.23% / **crisis +0.77% PF 1.87**
 (n=39). Consistent with every capitulation finding. Thin & regime-dependent; not a clean firewall pass.
-Next (P5): gate the signal on regime (crisis/risk_off) and re-validate OOS as a NEW trial (adds to N), +
-SHAP/permutation feature promotion + drift monitor. Scripts: scripts/swing_validate.py.
+Scripts: scripts/swing_validate.py.
+
+**P5 self-learning (scripts/swing_learn.py, N=16 incl. the pre-registered regime gate):**
+- REGIME-GATED (stress = risk_off+crisis, theory-motivated by the capitulation prior): exp **+0.68%/trade,
+  PF 1.82, Sharpe 1.35, DSR 1.00** — the strongest, most real signal in the project (3x the pooled book).
+  BUT **PBO 0.76** on threshold selection -> threshold choice is unreliable; pre-commit a threshold (no
+  selection) and it's a legitimate regime-conditional edge, pending a touch-once forward holdout. Does NOT
+  yet get the formal "clears" stamp (PBO>0.5 with selection).
+- OOS MDA feature importance (promote/decay): **regime_stress #1** (+0.019), then dist_sma200, bb_pos,
+  ret21, atr_pct, rs_spy20. RETIRE (no OOS skill): nr7, rsi_div, vol_thrust, rsi2, rsi14, dist_avwap,
+  dist_plow20 — the meta-model's skill is regime + location + medium momentum, NOT short-term oscillators.
+- Drift: strong in volatile years (2020/2023-25 +1.5..2.2%), weak in calm grinds (2017/18). Regime-dependent.
+- VERDICT: a real, economically strong, regime-conditional swing edge — the best found — but threshold-
+  selection-fragile; honest status = promising-not-yet-stamped. Next: pre-commit threshold + touch-once holdout.
 
 ## Round R3 — cross-sectional ML ranker (2026-06-26)  ·  VERDICT: MIRAGE (survivorship)
 

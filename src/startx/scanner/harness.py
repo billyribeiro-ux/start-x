@@ -76,6 +76,7 @@ def build_dataset(symbol, prices, spy, regime=None, *, pt_mult=2.0, sl_mult=1.0,
             rec[k] = float(frow.get(k, np.nan))
         if regime is not None and e["date"] in regime.index:
             rec["regime_stress"] = float(regime.loc[e["date"], "stress"])
+            rec["regime"] = regime.loc[e["date"], "regime"]
         rows.append(rec)
     df = pd.DataFrame(rows).dropna(subset=FEATURES, how="all")
     return df
@@ -179,6 +180,35 @@ def _pbo_cscv(oos: pd.DataFrame, thresholds, *, n_blocks=10) -> float:
 
 
 # --------------------------------------------------------------------------- LEAKAGE CANARIES
+def oos_permutation_importance(ds: pd.DataFrame, *, seed=0) -> pd.DataFrame:
+    """MDA feature importance measured OOS (not in-sample gain): train on the first 60%, then permute
+    each feature in the held-out 40% and record the AUC drop. Positive = the feature carries real OOS
+    skill (promote); ~0 or negative = noise (candidate for decay/retirement). The 'self-learning' signal.
+    """
+    import lightgbm as lgb
+    feat_cols = [c for c in FEATURES if c in ds.columns] + (["regime_stress"] if "regime_stress" in ds else [])
+    d = ds.sort_values("entry_date").reset_index(drop=True)
+    k = int(len(d) * 0.6)
+    if k < 150 or len(d) - k < 80:
+        return pd.DataFrame()
+    Xtr, ytr = d[feat_cols].fillna(0.0).iloc[:k], d["label"].iloc[:k]
+    Xte, yte = d[feat_cols].fillna(0.0).iloc[k:].reset_index(drop=True), d["label"].iloc[k:].to_numpy()
+    m = lgb.LGBMClassifier(n_estimators=200, learning_rate=0.03, num_leaves=15, min_child_samples=40,
+                           subsample=0.8, colsample_bytree=0.8, random_state=seed, n_jobs=1, verbosity=-1)
+    m.fit(Xtr, ytr)
+    base = _auc(yte, m.predict_proba(Xte)[:, 1])
+    rng = np.random.default_rng(seed)
+    rows = []
+    for col in feat_cols:
+        Xp = Xte.copy()
+        Xp[col] = rng.permutation(Xp[col].to_numpy())
+        drop = base - _auc(yte, m.predict_proba(Xp)[:, 1])
+        rows.append({"feature": col, "auc_drop": float(drop)})
+    out = pd.DataFrame(rows).sort_values("auc_drop", ascending=False).reset_index(drop=True)
+    out.attrs["base_auc"] = float(base)
+    return out
+
+
 def canary_shuffle(ds: pd.DataFrame, *, seed=0) -> float:
     """Shuffle the labels -> a correct harness must give OOS AUC ~0.5 (no edge from noise)."""
     rng = np.random.default_rng(seed)
