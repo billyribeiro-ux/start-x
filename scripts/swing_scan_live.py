@@ -25,7 +25,7 @@ import pandas as pd
 from startx.data.membership import SP500Membership
 from startx.scanner.harness import build_dataset
 from startx.scanner.regime import classify, regime_panel
-from startx.scanner.scan import STRESS, fit, surface
+from startx.scanner.scan import STOP_ATR_MULT, STRESS, fit, surface
 from startx.scanner.selflearn import ScannerMemory
 
 PRICE_DIR = "data/cache/prices"
@@ -84,7 +84,10 @@ def main():
     universe = ETFS + _liquid_stocks(mem, args.stocks)        # ETFs + indexes + STOCKS (all three pillars)
     print(f"  scanning {len(universe)} symbols: {len(ETFS)} ETFs/indexes + {len(universe)-len(ETFS)} stocks")
     prices = {s: _load(s) for s in universe}
-    data = pd.concat([build_dataset(s, prices[s], spy, reg) for s in universe], ignore_index=True)
+    # banked asymmetric config: sharp 1-ATR LABEL for selection, validated 2-ATR EXIT for the realised
+    # return (so cohort expectancy reflects how the trade is actually managed). See LEDGER R6.
+    data = pd.concat([build_dataset(s, prices[s], spy, reg, ret_sl_mult=STOP_ATR_MULT) for s in universe],
+                     ignore_index=True)
     data = data[data["entry_date"] >= "2012-01-01"]
     sm = fit(data)
 

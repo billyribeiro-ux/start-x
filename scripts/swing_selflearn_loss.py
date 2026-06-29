@@ -95,7 +95,9 @@ def _build_taken(stocks):
     universe = ETFS + _liquid_stocks(sp, stocks)
     print(f"building taken book across {len(universe)} symbols "
           f"({len(ETFS)} ETFs + {len(universe)-len(ETFS)} stocks)...")
-    data = pd.concat([build_dataset(s, _load(s), spy, reg) for s in universe], ignore_index=True)
+    # banked asymmetric config: sharp 1-ATR LABEL for selection + validated 2-ATR EXIT for realised return
+    data = pd.concat([build_dataset(s, _load(s), spy, reg, ret_sl_mult=2.0) for s in universe],
+                     ignore_index=True)
     data = data[data["entry_date"] >= REAL_DATA_START]
     oos = walk_forward(data, train_min=400, retrain_every=50)
     taken = oos[oos["regime"].isin(STRESS) & (oos["prob"] >= 0.5)].copy()

@@ -35,8 +35,15 @@ def _atr(p, n=14):
 
 
 def build_dataset(symbol, prices, spy, regime=None, *, pt_mult=2.0, sl_mult=1.0, horizon=10,
-                  cost_bps=3.0):
-    """Events + PIT features + triple-barrier meta-label (next-OPEN entry, ATR-sized). One symbol."""
+                  cost_bps=3.0, ret_sl_mult=None, ret_pt_mult=None):
+    """Events + PIT features + triple-barrier meta-label (next-OPEN entry, ATR-sized). One symbol.
+
+    The LABEL barrier (pt_mult, sl_mult) is the meta-model's training target — a SHARP 1-ATR stop keeps it
+    selective (re-validation R6: a wide 2-ATR label over-selects and dilutes the edge). The REALISED RETURN
+    can be computed under a SEPARATE exit (ret_pt_mult, ret_sl_mult) — the validated trade management is a
+    wider 2-ATR stop. When the ret_* overrides are None the return uses the label barrier (backward compat).
+    This asymmetry (sharp label for selection + wide exit for capture) is the banked swing configuration.
+    """
     p = prices.sort_values("date").reset_index(drop=True)
     feats = feature_frame(p, spy)
     ev = primary_events(p, feats)
@@ -50,6 +57,8 @@ def build_dataset(symbol, prices, spy, regime=None, *, pt_mult=2.0, sl_mult=1.0,
     dates = pd.DatetimeIndex(pd.to_datetime(p["date"]))
     pos = {d: i for i, d in enumerate(dates)}
     cost = cost_bps / 1e4
+    r_pt = pt_mult if ret_pt_mult is None else ret_pt_mult
+    r_sl = sl_mult if ret_sl_mult is None else ret_sl_mult
     rows = []
     for _, e in ev.iterrows():
         i = pos.get(e["date"])
@@ -60,16 +69,27 @@ def build_dataset(symbol, prices, spy, regime=None, *, pt_mult=2.0, sl_mult=1.0,
         pt = entry + pt_mult * atr[i]
         sl = entry - sl_mult * atr[i]
         last = min(ie + horizon, len(c) - 1)
-        label, exit_px, jx = 0, c[last], last
+        label, jx = 0, last
         for j in range(ie, last + 1):
-            if h[j] >= pt:                                  # profit target first -> a "take" win
-                label, exit_px, jx = 1, pt, j
+            if h[j] >= pt:                                  # profit target first -> a "take" win (label)
+                label, jx = 1, j
                 break
             if lo[j] <= sl:                                 # stop first
-                label, exit_px, jx = 0, sl, j
+                label, jx = 0, j
                 break
-        ret = (exit_px / entry - 1.0) - cost
-        rec = {"symbol": symbol, "date": e["date"], "entry_date": dates[ie], "t1": dates[jx],
+        # realised return under the (possibly wider) TRADE-MANAGEMENT exit
+        rpt = entry + r_pt * atr[i]
+        rsl = entry - r_sl * atr[i]
+        rexit, rjx = c[last], last
+        for j in range(ie, last + 1):
+            if h[j] >= rpt:
+                rexit, rjx = rpt, j
+                break
+            if lo[j] <= rsl:
+                rexit, rjx = rsl, j
+                break
+        ret = (rexit / entry - 1.0) - cost
+        rec = {"symbol": symbol, "date": e["date"], "entry_date": dates[ie], "t1": dates[max(jx, rjx)],
                "trigger": e["trigger"], "label": label, "ret": ret}
         frow = feats.loc[e["date"]]
         for k in FEATURES:

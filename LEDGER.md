@@ -64,6 +64,25 @@ recoveries. VERDICT: with the validated 2-ATR exit the stress-gated swing book i
 diversifier — the decoded system is now **long model (bankable core ~1.1-1.2) + 2-ATR swing satellite**,
 not the long model alone. **+1 trial → N.**
 
+**BANK-IT re-validation — consistent 2-ATR barrier vs the asymmetric R6 config (`swing_revalidate_2atr.py`).**
+The natural next step was "retrain the meta-model on 2-ATR LABELS so entry & exit agree." Tested on the
+touch-once holdout (DEV<2020 / HOLDOUT≥2020), same survivorship-free universe (10 ETFs + 80 stocks),
+stress+prob≥0.5:
+| config (label + exit) | HOLDOUT n | exp/trade | PF | Sharpe | DSR | DSR@N=30 | alpha | beta |
+|---|---|---|---|---|---|---|---|---|
+| 1-ATR label + 1-ATR exit (old) | 229 | +0.99% | 1.52 | 0.82 | 0.98 | 0.67 | +1.06% | +0.07 |
+| **1-ATR label + 2-ATR exit (R6, BANKED)** | 229 | **+1.48%** | **1.67** | **1.03** | **0.99** | **0.84** | **+1.80%** | +0.31 |
+| 2-ATR label + 2-ATR exit (consistent) | 701 | +0.52% | 1.23 | 0.41 | 0.95 | 0.55 | +0.99% | +0.38 |
+**Finding (counter-intuitive, firewall-caught):** making the barrier "consistent" is WORSE. A 2-ATR stop is
+rarely hit, so the 2-ATR LABEL is an easy ~64%-base-rate event that carries little information — the
+meta-model loses selectivity and waves through 3x as many diluted trades (701 vs 229), exp halves to
++0.52%, Sharpe 0.82→0.41. The entry model wants a SHARP label (1-ATR, for selection); the exit wants ROOM
+(2-ATR, for capture). **The optimal pipeline is ASYMMETRIC, not consistent.** The asymmetric R6 config is
+the most deflation-robust the swing edge has shown (HOLDOUT DSR 0.84 even at N=30). **BANKED** by decoupling
+the label barrier from the return barrier in `build_dataset` (`ret_sl_mult`): meta-model trains on the
+1-ATR label, realised return + cohort + live invalidation use the 2-ATR exit. Wired into the live scanner
+and the self-learning loop. **+1 trial → N.**
+
 ---
 
 ## Round R5 — self-learning LOSS loop (2026-06-28)  ·  VERDICT: the losses are NOT separably avoidable (firewall held)
@@ -224,7 +243,7 @@ liquid names. Detail in DECODE.md (single-name equities are long-biased at both 
 ---
 
 ## Running project N (fed to every DSR/PBO from here)
-Short campaign ≈ 336 · ranker A/B = 4 · misc baselines ≈ 10 · R5 loss-avoidance = 6 · R6 exits+sizing+ensemble = 10 → **N ≈ 366** and counting. With N this large,
+Short campaign ≈ 336 · ranker A/B = 4 · misc baselines ≈ 10 · R5 loss-avoidance = 6 · R6 exits+sizing+ensemble+bankit = 11 → **N ≈ 367** and counting. With N this large,
 the deflation bar is high by design: only edges with a strong prior + clean OOS + low search cost clear it.
 Validated production systems (the three rule-based books, the better long model) were each established under
 their own pre-registered, low-N protocols — see CHANGELOG/STRATEGY/FINDINGS — and are NOT diluted by this

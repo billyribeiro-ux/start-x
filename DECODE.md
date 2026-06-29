@@ -85,6 +85,11 @@ B/C harnesses in the decode scratchpad; `scripts/short_overbought_study.py` (E, 
 >   model it lifts the ensemble to **~1.8 Sharpe / Calmar ~1.1** (lift +0.66 vs +0.17 under 1-ATR; direction robust
 >   across concurrency caps). Caveat: the absolute ~1.8 is capped-calendar-construction-optimistic — bank the
 >   long model (~1.1-1.2) as the core and treat the 2-ATR swing as an additive satellite, sized conservatively.
+>   **BANK-IT re-validation:** retraining the meta-model on *consistent* 2-ATR labels is WORSE (over-selects,
+>   exp halves to +0.52%) — a wide stop makes the label an easy ~64%-base-rate event with no selectivity. The
+>   optimal config is **ASYMMETRIC: sharp 1-ATR label (selection) + wide 2-ATR exit (capture)** — most
+>   deflation-robust holdout the swing edge has shown (exp +1.48%/trade, DSR 0.84 at N=30). Banked via
+>   `build_dataset(ret_sl_mult=2.0)` (label barrier decoupled from return barrier).
 > - **Position book** (200-SMA) → drawdown-defense overlay (its own benchmarked mandate), not an alpha adder.
 > The earlier "constellation of edges assembled into ~1.5 Sharpe" was the survivorship/investability illusion.
 > The honest decode: **the long mean-reversion+breakout+fear engine is the edge; the rest is noise, beta, or
