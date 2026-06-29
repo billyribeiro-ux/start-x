@@ -11,6 +11,7 @@ import pandas as pd
 from startx.scanner.improve import (
     book_stats,
     calendar_book,
+    first_touch,
     per_trade_stats,
     resim_blotter,
     resim_returns,
@@ -79,6 +80,27 @@ def test_blotter_fields_and_fills():
     assert (r["exit_reason"] == "time") == (r["exit_time"] == "16:00 ET")
     assert r["exit_reason"] in ("target", "stop", "time")
     assert r["bars_held"] >= 0
+
+
+def test_first_touch_intraday():
+    bars = pd.DataFrame({
+        "datetime": pd.to_datetime(["2024-01-02 09:30:00", "2024-01-02 09:31:00",
+                                    "2024-01-02 09:32:00", "2024-01-02 09:33:00"]),
+        "open": [100, 100, 100, 100], "high": [100.5, 101.0, 102.0, 103.0],
+        "low": [99.5, 99.0, 98.0, 97.0], "close": [100, 100, 100, 100],
+    })
+    # target 101.5 first crossed by the 09:32 bar (high 102.0)
+    ts, px = first_touch(bars, "target", 101.5)
+    assert ts == pd.Timestamp("2024-01-02 09:32:00") and px == 101.5
+    # stop 98.5 first crossed by the 09:32 bar (low 98.0)
+    ts, px = first_touch(bars, "stop", 98.5)
+    assert ts == pd.Timestamp("2024-01-02 09:32:00")
+    # after_ts skips earlier bars
+    ts, _ = first_touch(bars, "stop", 99.2, after_ts=pd.Timestamp("2024-01-02 09:32:00"))
+    assert ts == pd.Timestamp("2024-01-02 09:32:00")
+    # never touched -> (None, None); empty -> (None, None)
+    assert first_touch(bars, "target", 999.0) == (None, None)
+    assert first_touch(pd.DataFrame(), "target", 1.0) == (None, None)
 
 
 def test_calendar_book_and_stats():

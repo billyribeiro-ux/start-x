@@ -46,6 +46,27 @@ def historical_price_eod(
     return df
 
 
+def historical_chart(
+    client: FMPClient, symbol: str, interval: str = "1min",
+    start: str | None = None, end: str | None = None,
+) -> pd.DataFrame:
+    """Intraday OHLCV bars (``interval`` in {1min,5min,15min,30min,1hour,4hour}) for one symbol.
+
+    Timestamps are US/Eastern regular-session (09:30–15:59). Returns tidy OHLCV sorted ascending by
+    ``datetime``; empty DataFrame on any API error so a missing intraday day never sinks a blotter run.
+    """
+    rows = _safe(lambda: client.get(
+        f"historical-chart/{interval}", symbol=symbol, **{"from": start, "to": end}))
+    if isinstance(rows, pd.DataFrame):           # _safe returned an empty frame (error path)
+        return rows
+    df = _to_df(rows, {"date": "datetime"})
+    if df.empty:
+        return df
+    keep = ["datetime", "open", "high", "low", "close", "volume"]
+    df = df[[c for c in keep if c in df.columns]].sort_values("datetime").reset_index(drop=True)
+    return df
+
+
 def profile(client: FMPClient, symbol: str) -> dict:
     data = client.get("profile", symbol=symbol)
     return data[0] if isinstance(data, list) and data else (data or {})

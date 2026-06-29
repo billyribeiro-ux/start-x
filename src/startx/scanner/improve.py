@@ -74,6 +74,18 @@ def _resim(taken: pd.DataFrame, prices_by_sym: dict, *, pt_mult, sl_mult, horizo
     return rets, exits
 
 
+def first_touch(bars: pd.DataFrame, side: str, level: float, after_ts=None):
+    """First intraday bar that crosses ``level`` (``side`` = 'target' -> high>=level, 'stop' -> low<=level),
+    optionally at/after ``after_ts``. Returns (timestamp, fill_price=level) or (None, None). Pure (no I/O)."""
+    if bars is None or bars.empty:
+        return None, None
+    b = bars if after_ts is None else bars[bars["datetime"] >= pd.Timestamp(after_ts)]
+    hit = b[b["high"] >= level] if side == "target" else b[b["low"] <= level]
+    if hit.empty:
+        return None, None
+    return pd.Timestamp(hit.iloc[0]["datetime"]), float(level)
+
+
 def resim_blotter(taken: pd.DataFrame, prices_by_sym: dict, *, pt_mult: float = 2.0, sl_mult: float = 2.0,
                   horizon: int = 10, cost_bps: float = 3.0) -> pd.DataFrame:
     """Per-trade BLOTTER under an exit policy: entry/exit date + session time + price + reason, bars held,
@@ -115,6 +127,7 @@ def resim_blotter(taken: pd.DataFrame, prices_by_sym: dict, *, pt_mult: float = 
                 exit_px, jx, reason = sl, j, "stop"
                 break
         gross = exit_px / entry - 1.0
+        barrier = pt if reason == "target" else (sl if reason == "stop" else float("nan"))
         rows.append({
             "symbol": sym, "trigger": e.get("trigger"), "regime": e.get("regime"),
             "signal_date": pd.Timestamp(e["date"]).date(),
@@ -122,6 +135,7 @@ def resim_blotter(taken: pd.DataFrame, prices_by_sym: dict, *, pt_mult: float = 
             "exit_date": dates[jx].date(),
             "exit_time": "16:00 ET" if reason == "time" else "intraday",
             "exit_px": round(float(exit_px), 2), "exit_reason": reason,
+            "barrier_level": float(barrier),       # UNROUNDED PT/SL for exact intraday touch-matching
             "bars_held": int(jx - ie), "gross_ret": gross, "net_ret": gross - cost,
             "pnl_per_share": round(float(exit_px - entry), 2),
         })
