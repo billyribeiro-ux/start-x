@@ -3,6 +3,9 @@
 .env.*
 !.env.example
 
+# Local Claude Code harness state (scheduled tasks, etc.) — not project artifacts
+.claude/
+
 # Local data cache (re-pullable from FMP) — anchored to repo root so it does NOT
 # match the source package src/startx/data/.
 /data/
