@@ -26,33 +26,27 @@ STRESS = ["risk_off", "crisis"]
 TR = 252
 
 
-def resim_returns(taken: pd.DataFrame, prices_by_sym: dict, *, pt_mult: float = 2.0, sl_mult: float = 1.0,
-                  horizon: int = 10, stress_sl_mult: float | None = None, stress_pt_mult: float | None = None,
-                  cost_bps: float = 3.0) -> np.ndarray:
-    """Re-walk the triple barrier for each taken entry under an alternative exit policy.
-
-    Reconstructs the exact build_dataset entry (signal bar = ``date``, next-OPEN entry, ATR at the signal
-    bar), then walks profit-target / stop / time. ``stress_sl_mult`` / ``stress_pt_mult`` override the
-    multipliers when the trade's regime is risk_off/crisis (the regime-scaled exit). Returns realised
-    net returns aligned to ``taken`` rows (NaN where the bar can't be located).
-    """
+def _resim(taken: pd.DataFrame, prices_by_sym: dict, *, pt_mult, sl_mult, horizon, stress_sl_mult,
+           stress_pt_mult, cost_bps):
+    """Core barrier re-walk. Returns (rets, exit_dates) aligned to ``taken`` rows (NaN/NaT if unlocatable)."""
     cost = cost_bps / 1e4
-    out = np.full(len(taken), np.nan)
+    rets = np.full(len(taken), np.nan)
+    exits = np.full(len(taken), np.datetime64("NaT"), dtype="datetime64[ns]")
     cache = {}
     for pos, (_, e) in enumerate(taken.iterrows()):
         sym = e["symbol"]
         if sym not in cache:
             p = prices_by_sym.get(sym)
-            if p is None:
-                cache[sym] = None
-            else:
-                p = p.sort_values("date").reset_index(drop=True)
-                cache[sym] = (p, pd.DatetimeIndex(pd.to_datetime(p["date"])), _atr(p).to_numpy(float))
+            cache[sym] = None if p is None else (
+                p.sort_values("date").reset_index(drop=True),
+                pd.DatetimeIndex(pd.to_datetime(p.sort_values("date")["date"])), None)
+            if cache[sym] is not None:
+                pp = cache[sym][0]
+                cache[sym] = (pp, cache[sym][1], _atr(pp).to_numpy(float))
         if cache[sym] is None:
             continue
         p, dates, atr = cache[sym]
-        loc = dates.get_indexer([pd.Timestamp(e["date"])])
-        i = int(loc[0])
+        i = int(dates.get_indexer([pd.Timestamp(e["date"])])[0])
         if i < 0 or i + 1 >= len(p) or not np.isfinite(atr[i]) or atr[i] <= 0:
             continue
         o = p["open"].to_numpy(float)
@@ -67,16 +61,45 @@ def resim_returns(taken: pd.DataFrame, prices_by_sym: dict, *, pt_mult: float = 
         pt = entry + ptm * atr[i]
         sl = entry - slm * atr[i]
         last = min(ie + horizon, len(c) - 1)
-        exit_px = c[last]
+        exit_px, jx = c[last], last
         for j in range(ie, last + 1):
             if h[j] >= pt:
-                exit_px = pt
+                exit_px, jx = pt, j
                 break
             if lo[j] <= sl:
-                exit_px = sl
+                exit_px, jx = sl, j
                 break
-        out[pos] = (exit_px / entry - 1.0) - cost
-    return out
+        rets[pos] = (exit_px / entry - 1.0) - cost
+        exits[pos] = dates[jx].to_datetime64()
+    return rets, exits
+
+
+def resim_returns(taken: pd.DataFrame, prices_by_sym: dict, *, pt_mult: float = 2.0, sl_mult: float = 1.0,
+                  horizon: int = 10, stress_sl_mult: float | None = None, stress_pt_mult: float | None = None,
+                  cost_bps: float = 3.0) -> np.ndarray:
+    """Re-walk the triple barrier for each taken entry under an alternative exit policy.
+
+    Reconstructs the exact build_dataset entry (signal bar = ``date``, next-OPEN entry, ATR at the signal
+    bar), then walks profit-target / stop / time. ``stress_sl_mult`` / ``stress_pt_mult`` override the
+    multipliers when the trade's regime is risk_off/crisis (the regime-scaled exit). Returns realised
+    net returns aligned to ``taken`` rows (NaN where the bar can't be located).
+    """
+    rets, _ = _resim(taken, prices_by_sym, pt_mult=pt_mult, sl_mult=sl_mult, horizon=horizon,
+                     stress_sl_mult=stress_sl_mult, stress_pt_mult=stress_pt_mult, cost_bps=cost_bps)
+    return rets
+
+
+def resim_trades(taken: pd.DataFrame, prices_by_sym: dict, *, pt_mult: float = 2.0, sl_mult: float = 1.0,
+                 horizon: int = 10, stress_sl_mult: float | None = None, stress_pt_mult: float | None = None,
+                 cost_bps: float = 3.0) -> pd.DataFrame:
+    """Copy of ``taken`` with ``ret`` AND ``t1`` recomputed under an alternative exit policy (so a calendar
+    book reflects the true, often longer, hold under a wider stop). Rows that can't be located are dropped."""
+    rets, exits = _resim(taken, prices_by_sym, pt_mult=pt_mult, sl_mult=sl_mult, horizon=horizon,
+                         stress_sl_mult=stress_sl_mult, stress_pt_mult=stress_pt_mult, cost_bps=cost_bps)
+    out = taken.copy()
+    out["ret"] = rets
+    out["t1"] = pd.to_datetime(exits)
+    return out.dropna(subset=["ret", "t1"]).reset_index(drop=True)
 
 
 def per_trade_stats(r: np.ndarray, *, n_trials: int = 1) -> dict:

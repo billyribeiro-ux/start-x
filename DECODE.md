@@ -79,9 +79,12 @@ B/C harnesses in the decode scratchpad; `scripts/short_overbought_study.py` (E, 
 > - **ML cross-sectional ranker** → survivorship MIRAGE (−0.18 OOS survivorship-free). Struck.
 > - **All shorts** (5 angles + regime) → no tradeable edge; market is long-biased at both tails. Struck.
 > - **Stress-gated SWING ALPHA** (the scanner) → a REAL per-trade pattern (+0.90%/trade, alpha +0.92%, beta 0.03,
->   generalizes ETFs/indexes/stocks) BUT as an investable capped book it's Sharpe 0.84 / **−36% DD**, and adding it
->   to the long model DRAGS the ensemble to 0.82 (−0.40 Sharpe) despite +0.05 correlation. Per-trade alpha ≠
->   investable book. NOT a portfolio improver — kept as a research/scanner pattern, not a sleeve.
+>   generalizes ETFs/indexes/stocks). The original "it drags the ensemble (1.22→0.82)" verdict was **exit-dependent**:
+>   under the old tight 1-ATR stop it was Sharpe 0.84 / −36% DD. **R6 fixed the exit (2-ATR stop) and it FLIPS:**
+>   the swing book becomes a genuine low-correlation (≈+0.03) diversifier — risk-parity-combined with the long
+>   model it lifts the ensemble to **~1.8 Sharpe / Calmar ~1.1** (lift +0.66 vs +0.17 under 1-ATR; direction robust
+>   across concurrency caps). Caveat: the absolute ~1.8 is capped-calendar-construction-optimistic — bank the
+>   long model (~1.1-1.2) as the core and treat the 2-ATR swing as an additive satellite, sized conservatively.
 > - **Position book** (200-SMA) → drawdown-defense overlay (its own benchmarked mandate), not an alpha adder.
 > The earlier "constellation of edges assembled into ~1.5 Sharpe" was the survivorship/investability illusion.
 > The honest decode: **the long mean-reversion+breakout+fear engine is the edge; the rest is noise, beta, or

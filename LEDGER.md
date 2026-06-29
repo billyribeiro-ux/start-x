@@ -42,6 +42,28 @@ in equal measure → no risk-adjusted gain. The edge model can't rank single-tra
 with the project-wide "direction/magnitude prediction is a coin flip" result). **Equal-weight stands.**
 **+9 trials → N** (7 exit grid + 2 sizing schemes).
 
+**ENSEMBLE re-assembly with the 2-ATR exit (`scripts/decode_ensemble_v2.py`) — the swing book now ADDS to
+the long model (the old "drag" verdict was exit-dependent).** Same cached taken events turned into a capped
+calendar book under each exit, risk-parity-combined with the same better long model (2018-26):
+| stream | Sharpe | CAGR | maxDD | Calmar |
+|---|---|---|---|---|
+| better long model | 1.14 | 12.1% | −14.8% | 0.82 |
+| swing book (1-ATR) | 1.06 | 9.7% | −27.9% | 0.35 |
+| swing book (2-ATR) | 1.51 | 14.3% | −34.9% | 0.41 |
+| ensemble w/ 1-ATR swing | 1.31 | 17.2% | −20.1% | 0.85 |
+| **ensemble w/ 2-ATR swing** | **1.80** | **24.8%** | −23.3% | **1.07** |
+| SPY buy&hold | 0.69 | 12.1% | −34.1% | 0.35 |
+corr(long_model, swing) ≈ +0.03 (near-orthogonal). Diversification lift over long-model-alone: 1-ATR
+**+0.17**, 2-ATR **+0.66** Sharpe. Concurrency-cap sensitivity (3/5/10/20) keeps the 2-ATR−1-ATR delta at
+**+0.42..+0.63** — the DIRECTION is robust, NOT a single-cap artifact. CAVEATS (honest): (a) the absolute
+ensemble ~1.8 is construction-optimistic — a capped-calendar Sharpe can overstate by averaging correlated
+stress-day names; trust the per-trade facts + the relative delta, size conservatively; (b) v2's swing
+construction (calendar_book, ETFs+120) differs from R4's `_swing_capped_book` (0.84, ETFs+60), so this
+UPDATES rather than literally overturns R4's 0.82 number; (c) the 2-ATR exit is favoured by 2018-26 V-shaped
+recoveries. VERDICT: with the validated 2-ATR exit the stress-gated swing book is a genuine low-correlation
+diversifier — the decoded system is now **long model (bankable core ~1.1-1.2) + 2-ATR swing satellite**,
+not the long model alone. **+1 trial → N.**
+
 ---
 
 ## Round R5 — self-learning LOSS loop (2026-06-28)  ·  VERDICT: the losses are NOT separably avoidable (firewall held)
@@ -202,7 +224,7 @@ liquid names. Detail in DECODE.md (single-name equities are long-biased at both 
 ---
 
 ## Running project N (fed to every DSR/PBO from here)
-Short campaign ≈ 336 · ranker A/B = 4 · misc baselines ≈ 10 · R5 loss-avoidance = 6 · R6 exits+sizing = 9 → **N ≈ 365** and counting. With N this large,
+Short campaign ≈ 336 · ranker A/B = 4 · misc baselines ≈ 10 · R5 loss-avoidance = 6 · R6 exits+sizing+ensemble = 10 → **N ≈ 366** and counting. With N this large,
 the deflation bar is high by design: only edges with a strong prior + clean OOS + low search cost clear it.
 Validated production systems (the three rule-based books, the better long model) were each established under
 their own pre-registered, low-N protocols — see CHANGELOG/STRATEGY/FINDINGS — and are NOT diluted by this
