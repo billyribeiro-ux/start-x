@@ -23,13 +23,42 @@ warnings.filterwarnings("ignore")
 import pandas as pd
 
 from startx.data.membership import SP500Membership
+from startx.fmp.client import FMPClient
+from startx.fmp.endpoints import historical_chart
 from startx.scanner.harness import build_dataset
+from startx.scanner.improve import resolve_trade
 from startx.scanner.regime import classify, regime_panel
 from startx.scanner.scan import STOP_ATR_MULT, STRESS, fit, surface
 from startx.scanner.selflearn import ScannerMemory
 
 PRICE_DIR = "data/cache/prices"
+INTRADAY_DIR = "data/cache/intraday"
 ETFS = ["SPY", "QQQ", "IWM", "DIA", "XLF", "XLK", "XLE", "SMH", "XLV", "XLU"]   # ETFs + index ETFs
+
+
+def _intraday_window(client, sym, d0, d1, sessions):
+    """Cached 1-min bars for sym across the trading days in [d0, d1] (dash->dot ticker fallback)."""
+    parts = []
+    for d in pd.to_datetime(sessions):
+        if not (d0 <= d <= d1):
+            continue
+        cache = f"{INTRADAY_DIR}/{sym}_{d.date()}.parquet"
+        df = None
+        if os.path.exists(cache):
+            df = pd.read_parquet(cache)
+            if df.empty:
+                df = None
+        if df is None:
+            for s in ([sym, sym.replace('-', '.')] if '-' in sym else [sym]):
+                got = historical_chart(client, s, "1min", start=str(d.date()), end=str(d.date()))
+                if not got.empty:
+                    os.makedirs(INTRADAY_DIR, exist_ok=True)
+                    got.to_parquet(cache)
+                    df = got
+                    break
+        if df is not None and not df.empty:
+            parts.append(df)
+    return pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
 
 
 def _liquid_stocks(mem, n, min_dv=50.0):
@@ -59,13 +88,49 @@ def _load(sym):
     return d.sort_values("date").reset_index(drop=True)
 
 
-def _card(s):
+def _resolve(s, prices, client, horizon=10):
+    """Resolve a setup to its institutional trade state (real entry/exit times + R-analytics)."""
+    px = prices.get(s.symbol)
+    if px is None or not (s.entry_ref == s.entry_ref) or not (s.invalidation == s.invalidation):
+        return None
+    sessions = px["date"]
+    target = 2 * s.entry_ref - s.invalidation                  # +2 ATR (mirror of the -2 ATR stop)
+    after = sessions[sessions >= pd.Timestamp(s.date)].reset_index(drop=True)
+    if after.empty:
+        return None
+    cap_date = after.iloc[min(horizon, len(after) - 1)]
+    bars = _intraday_window(client, s.symbol, pd.Timestamp(s.date), pd.Timestamp(cap_date), sessions)
+    entry_ts = pd.Timestamp(f"{pd.Timestamp(s.date).date()} 09:30:00")
+    cap_ts = pd.Timestamp(f"{pd.Timestamp(cap_date).date()} 16:00:00")
+    tr = resolve_trade(bars, entry_ts=entry_ts, entry_px=float(s.entry_ref),
+                       target=float(target), stop=float(s.invalidation), cap_ts=cap_ts)
+    tr["cap_date"] = pd.Timestamp(cap_date).date()
+    return tr
+
+
+def _card(s, tr=None):
     drv = ", ".join(f"{n}{'+' if v >= 0 else ''}{v:.2f}" for n, v in s.drivers)
     flag = "  ⛔AVOIDED" if s.vetoed else ""
     print(f"  {s.symbol:5} {str(s.date.date())}  {s.direction.upper():5} [{s.regime}]  trigger={s.trigger}{flag}")
-    print(f"        conviction(calibrated) {s.conviction:.0%}  |  entry~{s.entry_ref:.2f}  "
-          f"invalidation {s.invalidation:.2f} (2-ATR stop, ~10d hold)")
-    print(f"        drivers: {drv}")
+    print(f"        conviction(calibrated) {s.conviction:.0%}   drivers: {drv}")
+    target = 2 * s.entry_ref - s.invalidation
+    print(f"        ENTRY  {str(s.date.date())} 09:30:00 ET @ {s.entry_ref:7.2f}   "
+          f"TARGET {target:7.2f} (+2ATR)   STOP {s.invalidation:7.2f} (-2ATR)")
+    if tr and tr.get("status") in ("closed", "open"):
+        if tr["status"] == "closed":
+            et = pd.Timestamp(tr["exit_ts"])
+            tag = {"target": "TARGET HIT", "stop": "STOPPED", "time": "TIME-CAP"}.get(tr["reason"], tr["reason"])
+            print(f"        EXIT   {et.strftime('%Y-%m-%d %H:%M:%S')} ET @ {tr['px']:7.2f}   "
+                  f"[{tag}]  {tr['ret']*100:+5.1f}%  ({tr['r_multiple']:+.2f}R)  held {tr['sessions_held']}d")
+        else:
+            ct = pd.Timestamp(tr["exit_ts"])
+            print(f"        STATUS OPEN since {pd.Timestamp(tr['entry_ts']).strftime('%Y-%m-%d %H:%M')} ET   "
+                  f"last {ct.strftime('%Y-%m-%d %H:%M')} @ {tr['px']:7.2f} ({tr['r_multiple']:+.2f}R)  "
+                  f"held {tr['sessions_held']}d, cap {tr['cap_date']}")
+        print(f"        RISK   MFE {tr['mfe_R']:+.2f}R   MAE {tr['mae_R']:+.2f}R   "
+              f"risk/share {tr['risk_per_share']:.2f}")
+    elif tr is not None:
+        print("        (intraday detail unavailable for this symbol/date — EOD levels above stand)")
     print(f"        regime-cohort: exp {s.cohort_exp*100:+.2f}%  CVaR5% {s.cohort_cvar5*100:.2f}%  (n={s.cohort_n})")
     if s.vetoed:
         print(f"        self-learned avoid: {s.veto_reason}")
@@ -102,23 +167,26 @@ def main():
     print(f"\nSWING SCANNER — as-of {asof.date()}  |  current regime: {cur_regime}")
     print("(promoted rule: LONG swing setups in a STRESS regime with calibrated conviction >= 50%)\n")
 
+    print("  resolving real intraday entry/exit timestamps + R-analytics (FMP 1-min)...")
     setups = surface(sm, prices, reg, asof=asof, lookback=args.lookback, avoid_rules=avoid_rules)
-    if setups:
-        live = [s for s in setups if not s.vetoed]
-        avoided = [s for s in setups if s.vetoed]
-        print(f"=== {len(live)} actionable + {len(avoided)} self-avoided setup(s) in the last {args.lookback} sessions ===")
-        for s in setups:
-            _card(s)
-    else:
-        off = cur_regime not in STRESS
-        print(f"=== no live setups{' — gate OFF (current regime is not stress)' if off else ''} ===")
-        # show the most recent qualifying cohort as a worked example of the output card
-        hist = surface(sm, prices, reg, asof=asof, lookback=4000, avoid_rules=avoid_rules)
-        if hist:
-            ex = max(hist, key=lambda s: s.date)
-            print("\nMost recent qualifying setup (worked example of the card format):")
-            _card(ex)
-    print("\nEvery setup is explained to its drivers + a regime-matched cohort — no bare scores (charter).")
+    with FMPClient() as client:
+        if setups:
+            live = [s for s in setups if not s.vetoed]
+            avoided = [s for s in setups if s.vetoed]
+            print(f"=== {len(live)} actionable + {len(avoided)} self-avoided setup(s) in the last "
+                  f"{args.lookback} sessions ===")
+            for s in setups:
+                _card(s, _resolve(s, prices, client))
+        else:
+            off = cur_regime not in STRESS
+            print(f"=== no live setups{' — gate OFF (current regime is not stress)' if off else ''} ===")
+            hist = surface(sm, prices, reg, asof=asof, lookback=4000, avoid_rules=avoid_rules)
+            if hist:
+                ex = max(hist, key=lambda s: s.date)
+                print("\nMost recent qualifying setup (worked example of the institutional card):")
+                _card(ex, _resolve(ex, prices, client))
+    print("\nEvery setup: real entry/exit timestamps, +2ATR target / -2ATR stop, R-multiple + MFE/MAE,")
+    print("calibrated conviction, drivers, and a regime-matched cohort — no bare scores (charter).")
 
 
 if __name__ == "__main__":

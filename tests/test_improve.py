@@ -11,9 +11,11 @@ import pandas as pd
 from startx.scanner.improve import (
     book_stats,
     calendar_book,
+    first_touch,
     per_trade_stats,
     resim_blotter,
     resim_returns,
+    resolve_trade,
 )
 
 
@@ -79,6 +81,54 @@ def test_blotter_fields_and_fills():
     assert (r["exit_reason"] == "time") == (r["exit_time"] == "16:00 ET")
     assert r["exit_reason"] in ("target", "stop", "time")
     assert r["bars_held"] >= 0
+
+
+def test_first_touch_intraday():
+    bars = pd.DataFrame({
+        "datetime": pd.to_datetime(["2024-01-02 09:30:00", "2024-01-02 09:31:00",
+                                    "2024-01-02 09:32:00", "2024-01-02 09:33:00"]),
+        "open": [100, 100, 100, 100], "high": [100.5, 101.0, 102.0, 103.0],
+        "low": [99.5, 99.0, 98.0, 97.0], "close": [100, 100, 100, 100],
+    })
+    # target 101.5 first crossed by the 09:32 bar (high 102.0)
+    ts, px = first_touch(bars, "target", 101.5)
+    assert ts == pd.Timestamp("2024-01-02 09:32:00") and px == 101.5
+    # stop 98.5 first crossed by the 09:32 bar (low 98.0)
+    ts, px = first_touch(bars, "stop", 98.5)
+    assert ts == pd.Timestamp("2024-01-02 09:32:00")
+    # after_ts skips earlier bars
+    ts, _ = first_touch(bars, "stop", 99.2, after_ts=pd.Timestamp("2024-01-02 09:32:00"))
+    assert ts == pd.Timestamp("2024-01-02 09:32:00")
+    # never touched -> (None, None); empty -> (None, None)
+    assert first_touch(bars, "target", 999.0) == (None, None)
+    assert first_touch(pd.DataFrame(), "target", 1.0) == (None, None)
+
+
+def _min_bars(lows, highs, day="2024-01-02", start="09:30"):
+    n = len(lows)
+    ts = pd.date_range(f"{day} {start}:00", periods=n, freq="1min")
+    return pd.DataFrame({"datetime": ts, "open": highs, "high": highs, "low": lows,
+                         "close": [(h + lo) / 2 for h, lo in zip(highs, lows)]})
+
+
+def test_resolve_trade_target_stop_open():
+    cap = pd.Timestamp("2024-01-16 16:00:00")
+    # entry 100, target 110, stop 95 -> risk 5
+    # target first (high 111 at bar 2)
+    bars = _min_bars([99, 99, 100], [101, 105, 111])
+    tr = resolve_trade(bars, entry_ts="2024-01-02 09:30", entry_px=100.0, target=110.0, stop=95.0, cap_ts=cap)
+    assert tr["status"] == "closed" and tr["reason"] == "target"
+    assert tr["exit_ts"] == pd.Timestamp("2024-01-02 09:32:00")
+    assert abs(tr["r_multiple"] - 2.0) < 1e-9            # (110-100)/5
+    # stop first (low 94 at bar 1)
+    bars = _min_bars([99, 94, 100], [101, 102, 103])
+    tr = resolve_trade(bars, entry_ts="2024-01-02 09:30", entry_px=100.0, target=110.0, stop=95.0, cap_ts=cap)
+    assert tr["status"] == "closed" and tr["reason"] == "stop" and tr["r_multiple"] < 0
+    # neither touched, before cap -> OPEN, with MFE/MAE in R
+    bars = _min_bars([99, 98, 101], [101, 102, 104])
+    tr = resolve_trade(bars, entry_ts="2024-01-02 09:30", entry_px=100.0, target=110.0, stop=95.0, cap_ts=cap)
+    assert tr["status"] == "open"
+    assert abs(tr["mfe_R"] - (104 - 100) / 5) < 1e-9 and abs(tr["mae_R"] - (100 - 98) / 5) < 1e-9
 
 
 def test_calendar_book_and_stats():
