@@ -86,6 +86,46 @@ def first_touch(bars: pd.DataFrame, side: str, level: float, after_ts=None):
     return pd.Timestamp(hit.iloc[0]["datetime"]), float(level)
 
 
+def resolve_trade(bars: pd.DataFrame, *, entry_ts, entry_px: float, target: float, stop: float, cap_ts):
+    """Resolve one long trade against intraday 1-min ``bars`` — the institutional live-card state.
+
+    Returns entry/exit clock times + prices, OPEN-vs-CLOSED status, exit reason, and risk analytics in
+    R-multiples (R = entry - stop): realised R, MFE (max favourable excursion) and MAE (max adverse
+    excursion). Barrier ties within one minute resolve to the STOP (conservative). ``cap_ts`` is the
+    10-session time-cap close; if no barrier is touched and the bars reach the cap it exits "time",
+    otherwise the trade is still OPEN (current = last bar)."""
+    if bars is None or bars.empty:
+        return {"status": "no_data"}
+    b = bars[bars["datetime"] >= pd.Timestamp(entry_ts)].sort_values("datetime").reset_index(drop=True)
+    if b.empty:
+        return {"status": "no_data"}
+    risk = max(entry_px - stop, 1e-9)
+    hi, lo, cl = b["high"].to_numpy(), b["low"].to_numpy(), b["close"].to_numpy()
+    dt = b["datetime"].to_numpy()
+    cand = []
+    if (lo <= stop).any():
+        cand.append((int(np.argmax(lo <= stop)), "stop", stop))       # stop first on ties (conservative)
+    if (hi >= target).any():
+        cand.append((int(np.argmax(hi >= target)), "target", target))
+    if cand:
+        i, reason, exit_px = min(cand, key=lambda x: x[0])
+        used = b.iloc[:i + 1]
+        exit_ts, status, px = pd.Timestamp(dt[i]), "closed", float(exit_px)
+    else:
+        used = b
+        if pd.Timestamp(dt[-1]) >= pd.Timestamp(cap_ts):
+            reason, exit_ts, px, status = "time", pd.Timestamp(cap_ts), float(cl[-1]), "closed"
+        else:
+            reason, exit_ts, px, status = None, pd.Timestamp(dt[-1]), float(cl[-1]), "open"
+    mfe = float(used["high"].max()) - entry_px
+    mae = entry_px - float(used["low"].min())
+    sessions = int(pd.to_datetime(used["datetime"]).dt.normalize().nunique())
+    return {"status": status, "reason": reason, "entry_ts": pd.Timestamp(entry_ts), "entry_px": entry_px,
+            "exit_ts": exit_ts, "px": px, "target": target, "stop": stop, "risk_per_share": risk,
+            "r_multiple": (px - entry_px) / risk, "mfe_R": mfe / risk, "mae_R": mae / risk,
+            "sessions_held": sessions, "ret": px / entry_px - 1.0}
+
+
 def resim_blotter(taken: pd.DataFrame, prices_by_sym: dict, *, pt_mult: float = 2.0, sl_mult: float = 2.0,
                   horizon: int = 10, cost_bps: float = 3.0) -> pd.DataFrame:
     """Per-trade BLOTTER under an exit policy: entry/exit date + session time + price + reason, bars held,
