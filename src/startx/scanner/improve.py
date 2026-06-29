@@ -74,6 +74,60 @@ def _resim(taken: pd.DataFrame, prices_by_sym: dict, *, pt_mult, sl_mult, horizo
     return rets, exits
 
 
+def resim_blotter(taken: pd.DataFrame, prices_by_sym: dict, *, pt_mult: float = 2.0, sl_mult: float = 2.0,
+                  horizon: int = 10, cost_bps: float = 3.0) -> pd.DataFrame:
+    """Per-trade BLOTTER under an exit policy: entry/exit date + session time + price + reason, bars held,
+    and net P&L. Times are the EOD session convention (entries at the next OPEN 09:30 ET; time-cap exits at
+    the CLOSE 16:00 ET; target/stop exits are touched intraday -> exact clock time is not in EOD data, so
+    ``exit_time`` is flagged "intraday"). Prices are the modelled fills (next-open entry, barrier exit)."""
+    cost = cost_bps / 1e4
+    cache = {}
+    rows = []
+    for _, e in taken.iterrows():
+        sym = e["symbol"]
+        if sym not in cache:
+            p = prices_by_sym.get(sym)
+            if p is None:
+                cache[sym] = None
+            else:
+                p = p.sort_values("date").reset_index(drop=True)
+                cache[sym] = (p, pd.DatetimeIndex(pd.to_datetime(p["date"])), _atr(p).to_numpy(float))
+        if cache[sym] is None:
+            continue
+        p, dates, atr = cache[sym]
+        i = int(dates.get_indexer([pd.Timestamp(e["date"])])[0])
+        if i < 0 or i + 1 >= len(p) or not np.isfinite(atr[i]) or atr[i] <= 0:
+            continue
+        o = p["open"].to_numpy(float)
+        h = p["high"].to_numpy(float)
+        lo = p["low"].to_numpy(float)
+        c = p["close"].to_numpy(float)
+        ie = i + 1
+        entry = o[ie]
+        pt, sl = entry + pt_mult * atr[i], entry - sl_mult * atr[i]
+        last = min(ie + horizon, len(c) - 1)
+        exit_px, jx, reason = c[last], last, "time"
+        for j in range(ie, last + 1):
+            if h[j] >= pt:
+                exit_px, jx, reason = pt, j, "target"
+                break
+            if lo[j] <= sl:
+                exit_px, jx, reason = sl, j, "stop"
+                break
+        gross = exit_px / entry - 1.0
+        rows.append({
+            "symbol": sym, "trigger": e.get("trigger"), "regime": e.get("regime"),
+            "signal_date": pd.Timestamp(e["date"]).date(),
+            "entry_date": dates[ie].date(), "entry_time": "09:30 ET", "entry_px": round(float(entry), 2),
+            "exit_date": dates[jx].date(),
+            "exit_time": "16:00 ET" if reason == "time" else "intraday",
+            "exit_px": round(float(exit_px), 2), "exit_reason": reason,
+            "bars_held": int(jx - ie), "gross_ret": gross, "net_ret": gross - cost,
+            "pnl_per_share": round(float(exit_px - entry), 2),
+        })
+    return pd.DataFrame(rows)
+
+
 def resim_returns(taken: pd.DataFrame, prices_by_sym: dict, *, pt_mult: float = 2.0, sl_mult: float = 1.0,
                   horizon: int = 10, stress_sl_mult: float | None = None, stress_pt_mult: float | None = None,
                   cost_bps: float = 3.0) -> np.ndarray:

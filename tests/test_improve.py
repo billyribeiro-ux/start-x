@@ -8,7 +8,13 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from startx.scanner.improve import book_stats, calendar_book, per_trade_stats, resim_returns
+from startx.scanner.improve import (
+    book_stats,
+    calendar_book,
+    per_trade_stats,
+    resim_blotter,
+    resim_returns,
+)
 
 
 def _prices():
@@ -55,6 +61,24 @@ def test_regime_scaled_only_applies_in_stress():
     # and the calm one must equal the plain base-stop sim
     r_base_calm = resim_returns(calm, px, sl_mult=1.0, cost_bps=0.0)
     assert np.allclose(r_calm, r_base_calm, equal_nan=True)
+
+
+def test_blotter_fields_and_fills():
+    px = {"TST": _prices()}
+    taken = _taken()
+    bl = resim_blotter(taken, px, pt_mult=2.0, sl_mult=2.0, horizon=10, cost_bps=0.0)
+    assert len(bl) == 1
+    r = bl.iloc[0]
+    for col in ("entry_date", "entry_time", "entry_px", "exit_date", "exit_time", "exit_px",
+                "exit_reason", "bars_held", "net_ret", "pnl_per_share"):
+        assert col in bl.columns
+    # entry fills at the NEXT open after the signal bar (index 31 here, price 98.0)
+    assert abs(r["entry_px"] - 98.0) < 1e-9
+    assert r["entry_time"] == "09:30 ET"
+    # a time-cap exit is the close (16:00 ET); a touched barrier is flagged intraday
+    assert (r["exit_reason"] == "time") == (r["exit_time"] == "16:00 ET")
+    assert r["exit_reason"] in ("target", "stop", "time")
+    assert r["bars_held"] >= 0
 
 
 def test_calendar_book_and_stats():
