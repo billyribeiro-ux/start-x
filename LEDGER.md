@@ -11,6 +11,24 @@ the other side and why they keep losing, (3) the pre-stated kill condition.
 
 ---
 
+## Round R7 — adversarial fleet audit of the banked swing edge (2026-07-08)  ·  VERDICT: real per-trade & survives fills, but THIN + regime-conditional; the "1.80 ensemble" was construction illusion
+
+Three parallel red-team/audit agents attacked the R4-R6 banked swing claims. **Reproduction was EXACT everywhere (no fabrication)** — the corrections are about honest independence, multiple-testing, and portfolio construction, not fraud.
+
+**FILL REALISM (`scripts/audit_fills.py`) — ✅ SURVIVES.** Gap-aware fills (stop = min(stop, open_j); target = max(target, open_j)) net POSITIVE on the 2-ATR book (+0.14%/trade: 47 gap-through-targets at +1.77% outweigh 13 gap-through-stops at −2.05%). Intraday-realistic (1-min touch) fills cost only −0.11%/trade → +1.04%, DSR@30 0.74. **R6 "2-ATR beats 1-ATR" holds under EVERY fill model** (delta +0.25%..+0.50%); the 1-ATR config degrades MORE under gaps (47 gap-through-stops vs 13 — its tight stop gets gapped). The per-trade number is real, NOT a fill artifact.
+
+**RED-TEAM (`scripts/redteam_swing.py`) — per-trade edge real, but CONFIDENCE was overstated.** On the 229-trade holdout:
+- Reproduction exact (+1.48%, PF 1.67, DSR@30 0.84, α +1.80% β 0.31). V3 intrabar-ambiguity CLEAN (0/229). V1 dedup does NOT hurt (one-per-symbol-day +1.63%, DSR@30 0.89 — the CAT/GOOG-GOOGL/multi-trigger dupes were a slight drag, not inflation).
+- **V2 CLUSTERING (material):** the 229 "trades" fall on only **66 unique entry days** (max 27/day). The honest independent-bet stream (equal-weight per day-cluster): +1.51%/cluster, Sharpe 1.09, **DSR@30 0.38, DSR@367 0.12**; deduped → 56 clusters, DSR@30 0.26, **DSR@367 0.07**.
+- **V5 2020-ANCHOR (material):** by year — 2020 +1.44% (n=120, HALF the trades), 2021 +1.99%, **2022 −1.86% (PF 0.48, Sharpe −1.67)**, 2023 +2.96%, 2025 +2.88%, 2026 +9.33%. Ex-2020 entirely: +1.53%, DSR@367 0.37. **It LOST in the 2022 trending bear** — not all-weather; concentrated in V-shaped-recovery stress (consistent with the R6 exit caveat).
+- **V6 HONEST BAR:** deduped day-cluster stream at the project N=367 → **DSR 0.07** (cannot reject true Sharpe ≤ 0 at full multiple-testing on the honest independence unit).
+
+**SATELLITE (`scripts/satellite_book.py`) — the 1.80 ensemble was the over-diversification illusion.** Honest standalone (unit-capital, company-deduped, idle capital = 0): Sharpe **0.51** (T4) to **0.65** (vol-target T5), NOT 1.5+; the naive calendar_book (T1) shows Sharpe 1.29 but hides **−31.7% maxDD**. Ensembles with the core (1.22): risk-parity DRAGS to 0.91; small FIXED weights add modestly — **90/10 → 1.27 (DSR@380 0.76), 80/20 → 1.31 (DSR@380 0.80)** vs core-alone DSR@380 0.72. **Defensible number: core 1.22 → core+satellite ~1.2-1.3 at a small (10-20%) fixed weight, NOT 1.80.**
+
+**INTEGRATED VERDICT:** the bankable core stays the **better long model (Sharpe 1.22, DSR@380 0.72)**. The stress-gated swing is a REAL per-trade pattern that survives fills and dedup, but it is **THIN** (honest independence ~56-66 bets; DSR@367 ~0.07-0.12), **regime-conditional** (failed 2022), and adds only a **modest** diversification benefit (+0.05..+0.09 Sharpe) at a small fixed weight. **DOWNGRADE the swing satellite: size very small, do NOT headline its DSR at 0.84 (that treats 229 clustered names as independent), do NOT quote the 1.80 ensemble.** Scripts stand as the honest re-statement. **+~15 trials → N (≈382).**
+
+---
+
 ## Round R6 — improve the edge: exits + sizing (2026-06-28)  ·  VERDICT: ✅ EXIT improvement real (2-ATR stop); sizing null
 
 R5's diagnosis ("losers bleed through the tight 1-ATR stop; the loss-prone cohort has the fattest right

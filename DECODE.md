@@ -81,15 +81,18 @@ B/C harnesses in the decode scratchpad; `scripts/short_overbought_study.py` (E, 
 > - **Stress-gated SWING ALPHA** (the scanner) → a REAL per-trade pattern (+0.90%/trade, alpha +0.92%, beta 0.03,
 >   generalizes ETFs/indexes/stocks). The original "it drags the ensemble (1.22→0.82)" verdict was **exit-dependent**:
 >   under the old tight 1-ATR stop it was Sharpe 0.84 / −36% DD. **R6 fixed the exit (2-ATR stop) and it FLIPS:**
->   the swing book becomes a genuine low-correlation (≈+0.03) diversifier — risk-parity-combined with the long
->   model it lifts the ensemble to **~1.8 Sharpe / Calmar ~1.1** (lift +0.66 vs +0.17 under 1-ATR; direction robust
->   across concurrency caps). Caveat: the absolute ~1.8 is capped-calendar-construction-optimistic — bank the
->   long model (~1.1-1.2) as the core and treat the 2-ATR swing as an additive satellite, sized conservatively.
->   **BANK-IT re-validation:** retraining the meta-model on *consistent* 2-ATR labels is WORSE (over-selects,
->   exp halves to +0.52%) — a wide stop makes the label an easy ~64%-base-rate event with no selectivity. The
->   optimal config is **ASYMMETRIC: sharp 1-ATR label (selection) + wide 2-ATR exit (capture)** — most
->   deflation-robust holdout the swing edge has shown (exp +1.48%/trade, DSR 0.84 at N=30). Banked via
->   `build_dataset(ret_sl_mult=2.0)` (label barrier decoupled from return barrier).
+>   the swing book is a genuine low-correlation (≈+0.03) diversifier, and the optimal config is **ASYMMETRIC:
+>   sharp 1-ATR label (selection) + wide 2-ATR exit (capture)** — making it "consistent" (2-ATR label) is worse
+>   (over-selects, exp halves to +0.52%). Banked via `build_dataset(ret_sl_mult=2.0)`.
+>   ⚠️ **R7 ADVERSARIAL-FLEET CORRECTION (2026-07-08) — the earlier "~1.8 ensemble / DSR 0.84" was overstated.**
+>   The per-trade edge (+1.48%/trade) reproduces EXACTLY and SURVIVES realistic gap-aware + intraday fills (2-ATR
+>   still beats 1-ATR under every fill model). BUT: the 229 holdout "trades" cluster on only **66 unique days** —
+>   honest independent-bet count ~56-66, so DSR falls from 0.84 to **~0.26-0.38 @N=30 and ~0.07-0.12 @N=367**; the
+>   book **LOST −1.86%/trade in the 2022 trending bear** (edge concentrated in V-shaped-recovery stress); and the
+>   "~1.8 ensemble" was the over-diversification illusion (honest standalone satellite Sharpe **0.5-0.65**, not
+>   1.5+). Honest ensemble: core 1.22 → **~1.2-1.3 at a small 10-20% fixed weight** (RP over-weights and DRAGS to
+>   0.91). NET: the swing satellite is REAL but THIN and regime-conditional — **size very small; the long model is
+>   the bankable core.** See LEDGER R7 (scripts: redteam_swing / audit_fills / satellite_book).
 > - **Position book** (200-SMA) → drawdown-defense overlay (its own benchmarked mandate), not an alpha adder.
 > The earlier "constellation of edges assembled into ~1.5 Sharpe" was the survivorship/investability illusion.
 > The honest decode: **the long mean-reversion+breakout+fear engine is the edge; the rest is noise, beta, or
