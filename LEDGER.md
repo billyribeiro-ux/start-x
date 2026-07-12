@@ -11,6 +11,21 @@ the other side and why they keep losing, (3) the pre-stated kill condition.
 
 ---
 
+## Round R8 — new-alpha fleet search: PEAD + index-change drift (2026-07-08)  ·  VERDICT: long PEAD replicates OOS but is mostly BETA; index changes dead
+
+Two parallel new-sleeve searches, survivorship-free, DEV 2018-21 / touch-once HOLDOUT 2022-26.
+
+**PEAD post-earnings-announcement drift (`scripts/study_pead.py`, 16,327 in-window events, 16 trials):**
+- LONG top-quintile positive reactions — the drift is REAL and REPLICATES OOS. Holdout: H10 +60.9bp DSR 0.996; **H21 +119.7bp PF 1.45 DSR 1.000**; positive EVERY holdout year (2022 +94, 2023 +78, 2024 +259, 2025 +122 bp @H21). DEV agreed (H21 +105bp DSR 0.97). BUT **it is mostly BETA**: beta ≈ 0.85 vs SPY, market-neutral alpha only +15.6bp @H21 (t 0.84 — NOT significant); the drift largely IS the winners' market beta over the hold. As a raw sleeve it works but is long-biased -> likely correlated with the already-long core (corr-to-core NOT yet measured — the Round-2 gate).
+- SHORT bottom-quintile negative reactions — **DEAD** (holdout −20 to −70bp, DSR 0.000 across horizons). Post-negative-earnings names drift UP, not down. Consistent with every prior short on this desk.
+- VERDICT: **PROMOTE-CANDIDATE (long only, conditional)** — real OOS drift, but must clear a Round-2 gate: build a monthly sleeve return stream and measure correlation to the core long model + whether a beta-hedged version retains any bankable alpha. If it's just long beta, it doubles down, not diversifies.
+
+**Index inclusion/deletion drift (`scripts/study_inclusion_drift.py`, ~8-13 events/yr, n_trials=8):**
+- H1 deletion rebound: **KILL** (holdout net <= 0; wildly inconsistent by year, e.g. 2023 −1017bp).
+- H2 addition fade (a short): **INCONCLUSIVE** (+37.5bp holdout mean but DSR 0.19 << 0.95; small n). Effect has decayed as the literature says. No bankable sleeve.
+
+**Round-1 fleet net:** the only surviving new candidate is LONG PEAD, and its diversification value is unproven (probably long-beta). Index changes dead. **+~26 trials → N (≈408).**
+
 ## Round R7 — adversarial fleet audit of the banked swing edge (2026-07-08)  ·  VERDICT: real per-trade & survives fills, but THIN + regime-conditional; the "1.80 ensemble" was construction illusion
 
 Three parallel red-team/audit agents attacked the R4-R6 banked swing claims. **Reproduction was EXACT everywhere (no fabrication)** — the corrections are about honest independence, multiple-testing, and portfolio construction, not fraud.
